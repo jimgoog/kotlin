@@ -46,6 +46,7 @@ import org.jetbrains.kotlin.resolve.scopes.utils.findClassifier
 import org.jetbrains.kotlin.resolve.scopes.utils.findFunction
 import org.jetbrains.kotlin.resolve.scopes.utils.findPackage
 import org.jetbrains.kotlin.resolve.scopes.utils.findVariable
+import org.jetbrains.kotlin.resolve.targetPlatform
 import org.jetbrains.kotlin.utils.addIfNotNull
 import java.util.*
 
@@ -59,7 +60,7 @@ class ImportInsertHelperImpl(private val project: Project) : ImportInsertHelper(
 
     override fun isImportedWithDefault(importPath: ImportPath, contextFile: KtFile): Boolean {
         val defaultImportProvider = contextFile.getResolutionFacade().frontendService<DefaultImportProvider>()
-        return importPath.isImported(defaultImportProvider.defaultImports, defaultImportProvider.excludedImports)
+        return importPath.isImported(defaultImportProvider.allDefaultImports, contextFile.targetPlatform?.excludedImports.orEmpty())
     }
 
     override fun mayImportOnShortenReferences(descriptor: DeclarationDescriptor): Boolean {
