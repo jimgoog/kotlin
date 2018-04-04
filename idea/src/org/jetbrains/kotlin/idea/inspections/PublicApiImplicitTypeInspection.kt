@@ -5,15 +5,19 @@
 
 package org.jetbrains.kotlin.idea.inspections
 
+import com.intellij.codeInspection.ui.MultipleCheckboxOptionsPanel
 import org.jetbrains.kotlin.descriptors.CallableMemberDescriptor
 import org.jetbrains.kotlin.descriptors.effectiveVisibility
 import org.jetbrains.kotlin.idea.caches.resolve.resolveToDescriptorIfAny
 import org.jetbrains.kotlin.psi.KtFunction
 import org.jetbrains.kotlin.psi.KtProperty
 import org.jetbrains.kotlin.psi.psiUtil.containingClassOrObject
+import javax.swing.JComponent
 
-class PublicApiImplicitTypeInspection : AbstractImplicitTypeInspection(
-    { element, _ ->
+class PublicApiImplicitTypeInspection(
+    @JvmField var publicAPIOnly: Boolean = true
+) : AbstractImplicitTypeInspection(
+    { element, inspection ->
         element.containingClassOrObject?.isLocal != true &&
                 when (element) {
                     is KtFunction -> !element.isLocal
@@ -21,9 +25,17 @@ class PublicApiImplicitTypeInspection : AbstractImplicitTypeInspection(
                     else -> false
                 } && run {
             val callableMemberDescriptor = element.resolveToDescriptorIfAny() as? CallableMemberDescriptor
-            callableMemberDescriptor?.effectiveVisibility()?.toVisibility()?.isPublicAPI == true
+            val reportNonPublicAPI = !(inspection as PublicApiImplicitTypeInspection).publicAPIOnly
+            reportNonPublicAPI || callableMemberDescriptor?.effectiveVisibility()?.toVisibility()?.isPublicAPI == true
         }
     }
 ) {
+
     override val problemText = "For API stability, it's recommended to specify explicitly public & protected declaration types"
+
+    override fun createOptionsPanel(): JComponent? {
+        val panel = MultipleCheckboxOptionsPanel(this)
+        panel.addCheckbox("Apply only to public or protected members", "publicAPIOnly")
+        return panel
+    }
 }
