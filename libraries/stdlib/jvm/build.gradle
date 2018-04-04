@@ -134,6 +134,6 @@ compileExperimentalKotlin {
     }
 }
 
-compileJava9Sources(project, 'kotlin.stdlib', [sourceSets.builtins.output, sourceSets.main.output])
+compileJava9Sources(project, 'kotlin.stdlib')
 
 kotlin.experimental.coroutines 'enable'
