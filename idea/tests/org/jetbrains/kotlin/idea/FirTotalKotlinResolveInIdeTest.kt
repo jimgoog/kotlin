@@ -41,10 +41,14 @@ class FirTotalKotlinResolveInIdeTest : ModuleTestCase() {
             projectRootFile.walkTopDown().onEnter {
                 it.name.toLowerCase() !in setOf("testdata", "resources")
             }.filter {
-                it.isDirectory && (it.name in setOf("src", "test", "tests"))
+                it.isDirectory
             }.forEach { dir ->
-                val vdir = VfsUtil.findFileByIoFile(dir, true)!!
-                it.contentEntries.single().addSourceFolder(vdir, false)
+                val vdir by lazy { VfsUtil.findFileByIoFile(dir, true)!! }
+                if (dir.name in setOf("src", "test", "tests")) {
+                    it.contentEntries.single().addSourceFolder(vdir, false)
+                } else if (dir.name in setOf("build")) {
+                    it.contentEntries.single().addExcludeFolder(vdir)
+                }
             }
         }
 
