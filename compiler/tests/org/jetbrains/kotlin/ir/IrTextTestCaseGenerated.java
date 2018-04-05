@@ -368,6 +368,12 @@ public class IrTextTestCaseGenerated extends AbstractIrTextTestCase {
                 doTest(fileName);
             }
 
+            @TestMetadata("constExpressionsInAnnotationArguments.kt")
+            public void testConstExpressionsInAnnotationArguments() throws Exception {
+                String fileName = KotlinTestUtils.navigationMetadata("compiler/testData/ir/irText/declarations/annotations/constExpressionsInAnnotationArguments.kt");
+                doTest(fileName);
+            }
+
             @TestMetadata("constructorsWithAnnotations.kt")
             public void testConstructorsWithAnnotations() throws Exception {
                 String fileName = KotlinTestUtils.navigationMetadata("compiler/testData/ir/irText/declarations/annotations/constructorsWithAnnotations.kt");
@@ -434,9 +440,21 @@ public class IrTextTestCaseGenerated extends AbstractIrTextTestCase {
                 doTest(fileName);
             }
 
+            @TestMetadata("propertySetterParameterWithAnnotations.kt")
+            public void testPropertySetterParameterWithAnnotations() throws Exception {
+                String fileName = KotlinTestUtils.navigationMetadata("compiler/testData/ir/irText/declarations/annotations/propertySetterParameterWithAnnotations.kt");
+                doTest(fileName);
+            }
+
             @TestMetadata("receiverParameterWithAnnotations.kt")
             public void testReceiverParameterWithAnnotations() throws Exception {
                 String fileName = KotlinTestUtils.navigationMetadata("compiler/testData/ir/irText/declarations/annotations/receiverParameterWithAnnotations.kt");
+                doTest(fileName);
+            }
+
+            @TestMetadata("spreadOperatorInAnnotationArguments.kt")
+            public void testSpreadOperatorInAnnotationArguments() throws Exception {
+                String fileName = KotlinTestUtils.navigationMetadata("compiler/testData/ir/irText/declarations/annotations/spreadOperatorInAnnotationArguments.kt");
                 doTest(fileName);
             }
 

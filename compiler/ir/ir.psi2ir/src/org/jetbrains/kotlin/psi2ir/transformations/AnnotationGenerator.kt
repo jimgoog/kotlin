@@ -6,6 +6,7 @@
 package org.jetbrains.kotlin.psi2ir.transformations
 
 import org.jetbrains.kotlin.descriptors.ClassDescriptor
+import org.jetbrains.kotlin.descriptors.PropertySetterDescriptor
 import org.jetbrains.kotlin.descriptors.annotations.AnnotationDescriptor
 import org.jetbrains.kotlin.descriptors.annotations.AnnotationUseSiteTarget
 import org.jetbrains.kotlin.descriptors.annotations.AnnotationWithTarget
@@ -44,18 +45,23 @@ class AnnotationGenerator(private val context: GeneratorContext) : IrElementVisi
     override fun visitValueParameter(declaration: IrValueParameter) {
         super.visitValueParameter(declaration)
 
-        declaration.descriptor.type.annotations.getAllAnnotations()
-            .filter {
-                it.target == AnnotationUseSiteTarget.RECEIVER
-            }
+        val descriptor = declaration.descriptor
+        val containingDeclaration = descriptor.containingDeclaration
+
+        if (containingDeclaration is PropertySetterDescriptor) {
+            containingDeclaration.correspondingProperty.annotations.getUseSiteTargetedAnnotations()
+                .filter { it.target == AnnotationUseSiteTarget.SETTER_PARAMETER }
+                .generateAnnotationConstructorCalls(declaration)
+        }
+
+        descriptor.type.annotations.getAllAnnotations()
+            .filter { it.target == AnnotationUseSiteTarget.RECEIVER }
             .generateAnnotationConstructorCalls(declaration)
     }
 
     private fun generateAnnotationsForDeclaration(declaration: IrDeclaration) {
         declaration.descriptor.annotations.getAllAnnotations()
-            .filter {
-                isAnnotationTargetMatchingDeclaration(it.target, declaration)
-            }
+            .filter { isAnnotationTargetMatchingDeclaration(it.target, declaration) }
             .generateAnnotationConstructorCalls(declaration)
     }
 
