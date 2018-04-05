@@ -9,7 +9,6 @@ import com.intellij.openapi.util.Key
 import org.jetbrains.kotlin.container.StorageComponentContainer
 import org.jetbrains.kotlin.container.composeContainer
 import org.jetbrains.kotlin.container.useInstance
-import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.platform.PlatformToKotlinClassMap
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.UserDataProperty
@@ -18,56 +17,18 @@ import org.jetbrains.kotlin.resolve.calls.results.TypeSpecificityComparator
 import org.jetbrains.kotlin.resolve.checkers.*
 import org.jetbrains.kotlin.resolve.lazy.DelegationFilter
 import org.jetbrains.kotlin.resolve.scopes.SyntheticScopes
-import org.jetbrains.kotlin.storage.LockBasedStorageManager
 import org.jetbrains.kotlin.types.DynamicTypesSettings
-import java.util.*
 
-abstract class TargetPlatform(val platformName: String) {
-    override fun toString() = platformName
 
-    abstract val platformConfigurator: PlatformConfigurator
-    abstract fun getDefaultImports(includeKotlinComparisons: Boolean): List<ImportPath>
-    open val excludedImports: List<FqName> get() = emptyList()
-
-    abstract val multiTargetPlatform: MultiTargetPlatform
-
-    object Common : TargetPlatform("Default") {
-        private val defaultImports =
-            LockBasedStorageManager().createMemoizedFunction<Boolean, List<ImportPath>> { includeKotlinComparisons ->
-                ArrayList<ImportPath>().apply {
-                    listOf(
-                        "kotlin.*",
-                        "kotlin.annotation.*",
-                        "kotlin.collections.*",
-                        "kotlin.ranges.*",
-                        "kotlin.sequences.*",
-                        "kotlin.text.*",
-                        "kotlin.io.*"
-                    ).forEach { add(ImportPath.fromString(it)) }
-
-                    if (includeKotlinComparisons) {
-                        add(ImportPath.fromString("kotlin.comparisons.*"))
-                    }
-                }
-            }
-
-        override fun getDefaultImports(includeKotlinComparisons: Boolean): List<ImportPath> = defaultImports(includeKotlinComparisons)
-
-        override val platformConfigurator =
-            object : PlatformConfigurator(
-                DynamicTypesSettings(), listOf(), listOf(), listOf(), listOf(), listOf(),
-                IdentifierChecker.Default, OverloadFilter.Default, PlatformToKotlinClassMap.EMPTY, DelegationFilter.Default,
-                OverridesBackwardCompatibilityHelper.Default,
-                DeclarationReturnTypeSanitizer.Default
-            ) {
-                override fun configureModuleComponents(container: StorageComponentContainer) {
-                    container.useInstance(SyntheticScopes.Empty)
-                    container.useInstance(TypeSpecificityComparator.NONE)
-                }
-            }
-
-        override val multiTargetPlatform: MultiTargetPlatform
-            get() = MultiTargetPlatform.Common
+class CommonPlatformConfiguratorImpl : CommonPlatformConfigurator, PlatformConfiguratorBase(
+    DynamicTypesSettings(), listOf(), listOf(), listOf(), listOf(), listOf(),
+    IdentifierChecker.Default, OverloadFilter.Default, PlatformToKotlinClassMap.EMPTY, DelegationFilter.Default,
+    OverridesBackwardCompatibilityHelper.Default,
+    DeclarationReturnTypeSanitizer.Default
+) {
+    override fun configureModuleComponents(container: StorageComponentContainer) {
+        container.useInstance(SyntheticScopes.Empty)
+        container.useInstance(TypeSpecificityComparator.NONE)
     }
 }
 
@@ -105,7 +66,7 @@ private val DEFAULT_ANNOTATION_CHECKERS = listOf<AdditionalAnnotationChecker>(
 )
 
 
-abstract class PlatformConfigurator(
+abstract class PlatformConfiguratorBase(
     private val dynamicTypesSettings: DynamicTypesSettings,
     additionalDeclarationCheckers: List<DeclarationChecker>,
     additionalCallCheckers: List<CallChecker>,
@@ -118,7 +79,7 @@ abstract class PlatformConfigurator(
     private val delegationFilter: DelegationFilter,
     private val overridesBackwardCompatibilityHelper: OverridesBackwardCompatibilityHelper,
     private val declarationReturnTypeSanitizer: DeclarationReturnTypeSanitizer
-) {
+) : PlatformConfigurator {
     private val declarationCheckers: List<DeclarationChecker> = DEFAULT_DECLARATION_CHECKERS + additionalDeclarationCheckers
     private val callCheckers: List<CallChecker> = DEFAULT_CALL_CHECKERS + additionalCallCheckers
     private val typeCheckers: List<AdditionalTypeChecker> = DEFAULT_TYPE_CHECKERS + additionalTypeCheckers
@@ -126,9 +87,7 @@ abstract class PlatformConfigurator(
         DEFAULT_CLASSIFIER_USAGE_CHECKERS + additionalClassifierUsageCheckers
     private val annotationCheckers: List<AdditionalAnnotationChecker> = DEFAULT_ANNOTATION_CHECKERS + additionalAnnotationCheckers
 
-    abstract fun configureModuleComponents(container: StorageComponentContainer)
-
-    val platformSpecificContainer = composeContainer(this::class.java.simpleName) {
+    override val platformSpecificContainer = composeContainer(this::class.java.simpleName) {
         useInstance(dynamicTypesSettings)
         declarationCheckers.forEach { useInstance(it) }
         callCheckers.forEach { useInstance(it) }

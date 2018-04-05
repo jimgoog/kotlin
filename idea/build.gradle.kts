@@ -12,6 +12,7 @@ dependencies {
     compile(project(":core:descriptors.jvm"))
     compile(project(":compiler:backend"))
     compile(project(":compiler:cli-common"))
+    compile(project(":compiler:modules"))
     compile(project(":compiler:frontend"))
     compile(project(":compiler:frontend.java"))
     compile(project(":compiler:frontend.script"))

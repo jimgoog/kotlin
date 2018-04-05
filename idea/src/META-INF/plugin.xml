@@ -234,6 +234,9 @@
     <applicationService serviceInterface="org.jetbrains.kotlin.idea.KotlinPluginUpdater"
                         serviceImplementation="org.jetbrains.kotlin.idea.KotlinPluginUpdater"/>
 
+    <applicationService serviceInterface="org.jetbrains.kotlin.resolve.CommonPlatformConfigurator"
+                        serviceImplementation="org.jetbrains.kotlin.resolve.CommonPlatformConfiguratorImpl"/>
+
     <projectService serviceInterface="org.jetbrains.kotlin.idea.util.ImportInsertHelper"
                     serviceImplementation="org.jetbrains.kotlin.util.ImportInsertHelperImpl"/>
 
