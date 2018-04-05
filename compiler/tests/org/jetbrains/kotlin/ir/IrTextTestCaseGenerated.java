@@ -344,6 +344,18 @@ public class IrTextTestCaseGenerated extends AbstractIrTextTestCase {
                 doTest(fileName);
             }
 
+            @TestMetadata("annotationsWithDefaultParameterValues.kt")
+            public void testAnnotationsWithDefaultParameterValues() throws Exception {
+                String fileName = KotlinTestUtils.navigationMetadata("compiler/testData/ir/irText/declarations/annotations/annotationsWithDefaultParameterValues.kt");
+                doTest(fileName);
+            }
+
+            @TestMetadata("annotationsWithVarargParameters.kt")
+            public void testAnnotationsWithVarargParameters() throws Exception {
+                String fileName = KotlinTestUtils.navigationMetadata("compiler/testData/ir/irText/declarations/annotations/annotationsWithVarargParameters.kt");
+                doTest(fileName);
+            }
+
             @TestMetadata("arrayInAnnotationArguments.kt")
             public void testArrayInAnnotationArguments() throws Exception {
                 String fileName = KotlinTestUtils.navigationMetadata("compiler/testData/ir/irText/declarations/annotations/arrayInAnnotationArguments.kt");
@@ -362,6 +374,18 @@ public class IrTextTestCaseGenerated extends AbstractIrTextTestCase {
                 doTest(fileName);
             }
 
+            @TestMetadata("delegateFieldWithAnnotations.kt")
+            public void testDelegateFieldWithAnnotations() throws Exception {
+                String fileName = KotlinTestUtils.navigationMetadata("compiler/testData/ir/irText/declarations/annotations/delegateFieldWithAnnotations.kt");
+                doTest(fileName);
+            }
+
+            @TestMetadata("enumEntriesWithAnnotations.kt")
+            public void testEnumEntriesWithAnnotations() throws Exception {
+                String fileName = KotlinTestUtils.navigationMetadata("compiler/testData/ir/irText/declarations/annotations/enumEntriesWithAnnotations.kt");
+                doTest(fileName);
+            }
+
             @TestMetadata("enumsInAnnotationArguments.kt")
             public void testEnumsInAnnotationArguments() throws Exception {
                 String fileName = KotlinTestUtils.navigationMetadata("compiler/testData/ir/irText/declarations/annotations/enumsInAnnotationArguments.kt");
@@ -374,9 +398,27 @@ public class IrTextTestCaseGenerated extends AbstractIrTextTestCase {
                 doTest(fileName);
             }
 
+            @TestMetadata("fileAnnotations.kt")
+            public void testFileAnnotations() throws Exception {
+                String fileName = KotlinTestUtils.navigationMetadata("compiler/testData/ir/irText/declarations/annotations/fileAnnotations.kt");
+                doTest(fileName);
+            }
+
             @TestMetadata("functionsWithAnnotations.kt")
             public void testFunctionsWithAnnotations() throws Exception {
                 String fileName = KotlinTestUtils.navigationMetadata("compiler/testData/ir/irText/declarations/annotations/functionsWithAnnotations.kt");
+                doTest(fileName);
+            }
+
+            @TestMetadata("localDelegatedPropertiesWithAnnotations.kt")
+            public void testLocalDelegatedPropertiesWithAnnotations() throws Exception {
+                String fileName = KotlinTestUtils.navigationMetadata("compiler/testData/ir/irText/declarations/annotations/localDelegatedPropertiesWithAnnotations.kt");
+                doTest(fileName);
+            }
+
+            @TestMetadata("primaryConstructorParameterWithAnnotations.kt")
+            public void testPrimaryConstructorParameterWithAnnotations() throws Exception {
+                String fileName = KotlinTestUtils.navigationMetadata("compiler/testData/ir/irText/declarations/annotations/primaryConstructorParameterWithAnnotations.kt");
                 doTest(fileName);
             }
 
@@ -389,6 +431,12 @@ public class IrTextTestCaseGenerated extends AbstractIrTextTestCase {
             @TestMetadata("propertyAccessorsWithAnnotations.kt")
             public void testPropertyAccessorsWithAnnotations() throws Exception {
                 String fileName = KotlinTestUtils.navigationMetadata("compiler/testData/ir/irText/declarations/annotations/propertyAccessorsWithAnnotations.kt");
+                doTest(fileName);
+            }
+
+            @TestMetadata("receiverParameterWithAnnotations.kt")
+            public void testReceiverParameterWithAnnotations() throws Exception {
+                String fileName = KotlinTestUtils.navigationMetadata("compiler/testData/ir/irText/declarations/annotations/receiverParameterWithAnnotations.kt");
                 doTest(fileName);
             }
 

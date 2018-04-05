@@ -6,16 +6,12 @@
 package org.jetbrains.kotlin.psi2ir.transformations
 
 import org.jetbrains.kotlin.descriptors.ClassDescriptor
-import org.jetbrains.kotlin.descriptors.PropertyGetterDescriptor
-import org.jetbrains.kotlin.descriptors.PropertySetterDescriptor
 import org.jetbrains.kotlin.descriptors.annotations.AnnotationDescriptor
 import org.jetbrains.kotlin.descriptors.annotations.AnnotationUseSiteTarget
+import org.jetbrains.kotlin.descriptors.annotations.AnnotationWithTarget
 import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.UNDEFINED_OFFSET
-import org.jetbrains.kotlin.ir.declarations.IrDeclaration
-import org.jetbrains.kotlin.ir.declarations.IrField
-import org.jetbrains.kotlin.ir.declarations.IrProperty
-import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
+import org.jetbrains.kotlin.ir.declarations.*
 import org.jetbrains.kotlin.ir.expressions.IrCall
 import org.jetbrains.kotlin.ir.expressions.impl.IrCallImpl
 import org.jetbrains.kotlin.ir.visitors.IrElementVisitorVoid
@@ -45,12 +41,26 @@ class AnnotationGenerator(private val context: GeneratorContext) : IrElementVisi
         generateAnnotationsForDeclaration(declaration)
     }
 
+    override fun visitValueParameter(declaration: IrValueParameter) {
+        super.visitValueParameter(declaration)
+
+        declaration.descriptor.type.annotations.getAllAnnotations()
+            .filter {
+                it.target == AnnotationUseSiteTarget.RECEIVER
+            }
+            .generateAnnotationConstructorCalls(declaration)
+    }
+
     private fun generateAnnotationsForDeclaration(declaration: IrDeclaration) {
-        val allAnnotations = declaration.descriptor.annotations.getAllAnnotations()
-        val matchingAnnotations = allAnnotations.filter {
-            isAnnotationTargetMatchingDeclaration(it.target, declaration)
-        }
-        matchingAnnotations.mapTo(declaration.annotations) {
+        declaration.descriptor.annotations.getAllAnnotations()
+            .filter {
+                isAnnotationTargetMatchingDeclaration(it.target, declaration)
+            }
+            .generateAnnotationConstructorCalls(declaration)
+    }
+
+    private fun List<AnnotationWithTarget>.generateAnnotationConstructorCalls(declaration: IrDeclaration) {
+        mapTo(declaration.annotations) {
             generateAnnotationConstructorCall(it.annotation)
         }
     }
@@ -80,8 +90,7 @@ class AnnotationGenerator(private val context: GeneratorContext) : IrElementVisi
 
         for (valueParameter in primaryConstructorDescriptor.valueParameters) {
             val argumentIndex = valueParameter.index
-            val argumentValue = annotationDescriptor.allValueArguments[valueParameter.name]
-                    ?: throw AssertionError("Annotation $annotationDescriptor missing value argument for $valueParameter")
+            val argumentValue = annotationDescriptor.allValueArguments[valueParameter.name] ?: continue
             val irArgument =
                 constantValueGenerator.generateConstantValueAsExpression(
                     UNDEFINED_OFFSET,
@@ -97,18 +106,17 @@ class AnnotationGenerator(private val context: GeneratorContext) : IrElementVisi
 
     private fun isAnnotationTargetMatchingDeclaration(target: AnnotationUseSiteTarget?, element: IrElement): Boolean =
         when (element) {
-            is IrProperty -> target == null || target == AnnotationUseSiteTarget.PROPERTY
+            is IrProperty ->
+                target == null || target == AnnotationUseSiteTarget.PROPERTY
 
-            is IrField -> target == AnnotationUseSiteTarget.FIELD
+            is IrField ->
+                target == AnnotationUseSiteTarget.FIELD || target == AnnotationUseSiteTarget.PROPERTY_DELEGATE_FIELD
 
             is IrSimpleFunction ->
-                target == null || element.descriptor.let {
-                    when (it) {
-                        is PropertyGetterDescriptor -> target == AnnotationUseSiteTarget.PROPERTY_GETTER
-                        is PropertySetterDescriptor -> target == AnnotationUseSiteTarget.PROPERTY_SETTER
-                        else -> false
-                    }
-                }
+                target == null || target == AnnotationUseSiteTarget.PROPERTY_GETTER || target == AnnotationUseSiteTarget.PROPERTY_SETTER
+
+            is IrValueParameter ->
+                target == null || target == AnnotationUseSiteTarget.CONSTRUCTOR_PARAMETER
 
             else -> target == null
         }
