@@ -23,6 +23,12 @@ interface KotlinInterface : JavaInterface {
     fun fooo() {
         <!INTERFACE_STATIC_METHOD_CALL_FROM_JAVA6_TARGET!>testStatic<!>()
         super.<!INTERFACE_CANT_CALL_DEFAULT_METHOD_VIA_SUPER!>test<!>()
+
+        object  {
+            fun run () {
+                super@KotlinInterface.<!INTERFACE_CANT_CALL_DEFAULT_METHOD_VIA_SUPER!>test<!>()
+            }
+        }
     }
 
     override fun testOverride(): String {
@@ -34,6 +40,12 @@ interface KotlinInterfaceInderectInheritance : KotlinInterface {
     fun foooo() {
         <!INTERFACE_STATIC_METHOD_CALL_FROM_JAVA6_TARGET!>testStatic<!>()
         super.<!INTERFACE_CANT_CALL_DEFAULT_METHOD_VIA_SUPER!>test<!>()
+
+        object  {
+            fun run () {
+                super@KotlinInterfaceInderectInheritance.<!INTERFACE_CANT_CALL_DEFAULT_METHOD_VIA_SUPER!>test<!>()
+            }
+        }
     }
 }
 
@@ -42,6 +54,12 @@ open class KotlinClass : JavaInterface {
         <!INTERFACE_STATIC_METHOD_CALL_FROM_JAVA6_TARGET!>testStatic<!>()
         super.<!DEFAULT_METHOD_CALL_FROM_JAVA6_TARGET!>test<!>()
         super.<!DEFAULT_METHOD_CALL_FROM_JAVA6_TARGET!>testOverride<!>()
+
+        object  {
+            fun run () {
+                super@KotlinClass.<!DEFAULT_METHOD_CALL_FROM_JAVA6_TARGET!>test<!>()
+            }
+        }
     }
 }
 
@@ -50,6 +68,12 @@ class KotlinClassInderectInheritance : KotlinClass() {
         <!INTERFACE_STATIC_METHOD_CALL_FROM_JAVA6_TARGET!>testStatic<!>()
         super.test()
         super.testOverride()
+
+        object  {
+            fun run () {
+                super@KotlinClassInderectInheritance.test()
+            }
+        }
     }
 }
 
@@ -58,6 +82,12 @@ class KotlinClassInderectInheritance2 : KotlinInterfaceInderectInheritance {
         <!INTERFACE_STATIC_METHOD_CALL_FROM_JAVA6_TARGET!>testStatic<!>()
         super.<!DEFAULT_METHOD_CALL_FROM_JAVA6_TARGET!>test<!>()
         super.testOverride()
+
+        object  {
+            fun run () {
+                super@KotlinClassInderectInheritance2.<!DEFAULT_METHOD_CALL_FROM_JAVA6_TARGET!>test<!>()
+            }
+        }
     }
 }
 
