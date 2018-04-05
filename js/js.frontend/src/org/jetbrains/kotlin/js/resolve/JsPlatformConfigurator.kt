@@ -23,17 +23,14 @@ import org.jetbrains.kotlin.js.analyze.JsNativeDiagnosticSuppressor
 import org.jetbrains.kotlin.js.naming.NameSuggestion
 import org.jetbrains.kotlin.js.resolve.diagnostics.*
 import org.jetbrains.kotlin.platform.PlatformToKotlinClassMap
-import org.jetbrains.kotlin.resolve.DeclarationReturnTypeSanitizer
-import org.jetbrains.kotlin.resolve.OverloadFilter
-import org.jetbrains.kotlin.resolve.OverridesBackwardCompatibilityHelper
-import org.jetbrains.kotlin.resolve.PlatformConfigurator
+import org.jetbrains.kotlin.resolve.*
 import org.jetbrains.kotlin.resolve.calls.checkers.ReifiedTypeParameterSubstitutionChecker
 import org.jetbrains.kotlin.resolve.checkers.ExpectedActualDeclarationChecker
 import org.jetbrains.kotlin.resolve.lazy.DelegationFilter
 import org.jetbrains.kotlin.resolve.scopes.SyntheticScopes
 import org.jetbrains.kotlin.types.DynamicTypesAllowed
 
-object JsPlatformConfigurator : PlatformConfigurator(
+object JsPlatformConfigurator : PlatformConfiguratorBase(
         DynamicTypesAllowed(),
         additionalDeclarationCheckers = listOf(
                 NativeInvokeChecker(), NativeGetterChecker(), NativeSetterChecker(),
