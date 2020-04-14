@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2020 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -8,6 +8,7 @@ package org.jetbrains.kotlin.idea.intentions.branchedTransformations.intentions
 import com.intellij.codeInsight.intention.LowPriorityAction
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.util.TextRange
+import org.jetbrains.kotlin.idea.KotlinBundle
 import org.jetbrains.kotlin.idea.caches.resolve.analyze
 import org.jetbrains.kotlin.idea.intentions.SelfTargetingRangeIntention
 import org.jetbrains.kotlin.idea.intentions.branchedTransformations.convertToIfNotNullExpression
@@ -21,15 +22,15 @@ import org.jetbrains.kotlin.resolve.calls.callUtil.getResolvedCall
 import org.jetbrains.kotlin.resolve.lazy.BodyResolveMode
 import org.jetbrains.kotlin.types.TypeUtils
 
-class ElvisToIfThenIntention :
-    SelfTargetingRangeIntention<KtBinaryExpression>(KtBinaryExpression::class.java, "Replace elvis expression with 'if' expression"),
-    LowPriorityAction {
-    override fun applicabilityRange(element: KtBinaryExpression): TextRange? {
-        return if (element.operationToken == KtTokens.ELVIS && element.left != null && element.right != null)
+class ElvisToIfThenIntention : SelfTargetingRangeIntention<KtBinaryExpression>(
+    KtBinaryExpression::class.java,
+    KotlinBundle.lazyMessage("replace.elvis.expression.with.if.expression")
+), LowPriorityAction {
+    override fun applicabilityRange(element: KtBinaryExpression): TextRange? =
+        if (element.operationToken == KtTokens.ELVIS && element.left != null && element.right != null)
             element.operationReference.textRange
         else
             null
-    }
 
     private fun KtExpression.findSafeCastReceiver(context: BindingContext): KtBinaryExpressionWithTypeRHS? {
         var current = this
@@ -41,10 +42,10 @@ class ElvisToIfThenIntention :
             }
             current = current.receiverExpression
         }
+
         current = KtPsiUtil.safeDeparenthesize(current)
         return (current as? KtBinaryExpressionWithTypeRHS)?.takeIf {
-            it.operationReference.getReferencedNameElementType() === KtTokens.AS_SAFE &&
-                    it.right != null
+            it.operationReference.getReferencedNameElementType() === KtTokens.AS_SAFE && it.right != null
         }
     }
 
@@ -53,9 +54,7 @@ class ElvisToIfThenIntention :
         newReceiver: KtExpression,
         topLevel: Boolean = true
     ): KtExpression {
-        if (this !is KtQualifiedExpression) {
-            return newReceiver
-        }
+        if (this !is KtQualifiedExpression) return newReceiver
         return factory.buildExpression(reformat = topLevel) {
             appendExpression(receiverExpression.buildExpressionWithReplacedReceiver(factory, newReceiver, topLevel = false))
             appendFixedText(".")

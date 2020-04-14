@@ -14,14 +14,14 @@ fun test_1() {
 
 fun test_2() {
     <!NEW_INFERENCE_NO_INFORMATION_FOR_PARAMETER!>sequence<!> {
-        yield(<!NEW_INFERENCE_NO_INFORMATION_FOR_PARAMETER!>materialize<!>())
+        <!NEW_INFERENCE_NO_INFORMATION_FOR_PARAMETER!>yield<!>(<!NEW_INFERENCE_NO_INFORMATION_FOR_PARAMETER!>materialize<!>())
     }
 }
 
 fun test_3() {
     sequence {
         yield(materialize<Int>())
-        <!NEW_INFERENCE_NO_INFORMATION_FOR_PARAMETER!>materialize<!>()
+        <!TYPE_MISMATCH, TYPE_MISMATCH, TYPE_MISMATCH, TYPE_MISMATCH!>materialize()<!>
     }
 }
 

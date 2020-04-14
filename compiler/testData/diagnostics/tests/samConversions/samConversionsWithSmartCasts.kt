@@ -25,7 +25,7 @@ fun test3(a: () -> Unit) {
 
 fun test4(a: () -> Unit, b: () -> Unit) {
     if (a is Runnable) {
-        J().run2(a, b)
+        J().run2(<!DEBUG_INFO_SMARTCAST!>a<!>, b)
     }
 }
 
@@ -49,7 +49,7 @@ fun test6(a: Any) {
 
 fun test7(a: (Int) -> Int) {
     a <!UNCHECKED_CAST!>as () -> Unit<!>
-    J().run1(<!DEBUG_INFO_SMARTCAST!>a<!>)
+    J().run1(<!TYPE_MISMATCH!>a<!>)
 }
 
 fun test8(a: () -> Unit) {

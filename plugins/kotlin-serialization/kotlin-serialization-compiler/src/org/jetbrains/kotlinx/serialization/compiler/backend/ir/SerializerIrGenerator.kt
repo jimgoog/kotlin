@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2020 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -13,7 +13,10 @@ import org.jetbrains.kotlin.descriptors.*
 import org.jetbrains.kotlin.ir.builders.*
 import org.jetbrains.kotlin.ir.declarations.*
 import org.jetbrains.kotlin.ir.expressions.*
-import org.jetbrains.kotlin.ir.expressions.impl.*
+import org.jetbrains.kotlin.ir.expressions.impl.IrBranchImpl
+import org.jetbrains.kotlin.ir.expressions.impl.IrConstImpl
+import org.jetbrains.kotlin.ir.expressions.impl.IrDelegatingConstructorCallImpl
+import org.jetbrains.kotlin.ir.expressions.impl.IrGetValueImpl
 import org.jetbrains.kotlin.ir.symbols.IrConstructorSymbol
 import org.jetbrains.kotlin.ir.symbols.IrFunctionSymbol
 import org.jetbrains.kotlin.ir.types.*
@@ -40,7 +43,7 @@ object SERIALIZABLE_PLUGIN_ORIGIN : IrDeclarationOriginImpl("SERIALIZER")
 
 open class SerializerIrGenerator(val irClass: IrClass, final override val compilerContext: SerializationPluginContext, bindingContext: BindingContext) :
     SerializerCodegen(irClass.descriptor, bindingContext), IrBuilderExtension {
-    protected val serializableIrClass = compilerContext.symbolTable.referenceClass(serializableDescriptor).owner
+    protected val serializableIrClass = compilerContext.symbolTable.referenceClass(serializableDescriptor).takeIf { it.isBound }?.owner
 
     override fun generateSerialDesc() {
         val desc: PropertyDescriptor = generatedSerialDescPropertyDescriptor ?: return
@@ -57,10 +60,9 @@ open class SerializerIrGenerator(val irClass: IrClass, final override val compil
 
             introduceValueParameter(thisAsReceiverParameter)
             prop = generateSimplePropertyWithBackingField(thisAsReceiverParameter.symbol, desc, irClass)
-            irClass.addMember(prop)
 
             localSerializersFieldsDescriptors.forEach {
-                irClass.addMember(generateSimplePropertyWithBackingField(thisAsReceiverParameter.symbol, it, irClass))
+                generateSimplePropertyWithBackingField(thisAsReceiverParameter.symbol, it, irClass)
             }
         }
 
@@ -81,7 +83,7 @@ open class SerializerIrGenerator(val irClass: IrClass, final override val compil
                         addElementsContentToDescriptor(serialDescImplClass, localDesc, addFuncS)
                         // add class annotations
                         copySerialInfoAnnotationsToDescriptor(
-                            serializableIrClass.annotations,
+                            serializableIrClass?.annotations.orEmpty(),
                             localDesc,
                             serialDescImplClass.referenceMethod(CallingConventions.addClassAnnotation)
                         )
@@ -110,7 +112,7 @@ open class SerializerIrGenerator(val irClass: IrClass, final override val compil
         val serialClassDescImplCtor = compilerContext.symbolTable.referenceConstructor(serialDescImplConstructor)
         return irInvoke(
             null, serialClassDescImplCtor,
-            irString(serialName), if (isGeneratedSerializer) correctThis else irNull()
+            irString(serialName), if (isGeneratedSerializer) correctThis else irNull(), irInt(serializableProperties.size)
         )
     }
 
@@ -191,38 +193,47 @@ open class SerializerIrGenerator(val irClass: IrClass, final override val compil
         +irReturn(array)
     }
 
+    override fun generateTypeParamsSerializersGetter(function: FunctionDescriptor) = irClass.contributeFunction(function) { irFun ->
+        val typeParams = serializableDescriptor.declaredTypeParameters.mapIndexed { idx, _ ->
+            irGetField(
+                irGet(irFun.dispatchReceiverParameter!!),
+                compilerContext.symbolTable.referenceField(localSerializersFieldsDescriptors[idx]).owner
+            )
+        }
+        val kSerType = ((irFun.returnType as IrSimpleType).arguments.first() as IrTypeProjection).type
+        val array = createArrayOfExpression(kSerType, typeParams)
+        +irReturn(array)
+    }
+
     override fun generateSerializableClassProperty(property: PropertyDescriptor) {
         /* Already implemented in .generateSerialClassDesc ? */
     }
 
-    protected fun ClassDescriptor.referenceMethod(methodName: String) =
-        getFuncDesc(methodName).single().let { compilerContext.symbolTable.referenceFunction(it) }
+    protected inline fun ClassDescriptor.referenceMethod(methodName: String, predicate: (FunctionDescriptor) -> Boolean = { true }) =
+        getFuncDesc(methodName).single(predicate).let { compilerContext.symbolTable.referenceFunction(it) }
 
     override fun generateSave(function: FunctionDescriptor) = irClass.contributeFunction(function) { saveFunc ->
 
         val fieldInitializer: (SerializableProperty) -> IrExpression? =
-            buildInitializersRemapping(serializableIrClass).run { { invoke(it.irField) } }
+            buildInitializersRemapping(
+                serializableIrClass ?: error("Please provide implementation of .deserialize method for external class")
+            ).run { { invoke(it.irField) } }
 
         fun irThis(): IrExpression =
             IrGetValueImpl(startOffset, endOffset, saveFunc.dispatchReceiverParameter!!.symbol)
 
         val kOutputClass = serializerDescriptor.getClassFromSerializationPackage(STRUCTURE_ENCODER_CLASS)
-        val kOutputSmallClass = serializerDescriptor.getClassFromSerializationPackage(ENCODER_CLASS)
+        val encoderClass = serializerDescriptor.getClassFromSerializationPackage(ENCODER_CLASS)
 
         val descriptorGetterSymbol = compilerContext.symbolTable.referenceFunction(anySerialDescProperty?.getter!!) //???
 
         val localSerialDesc = irTemporary(irGet(descriptorGetterSymbol.owner.returnType, irThis(), descriptorGetterSymbol), "desc")
 
         //  fun beginStructure(desc: SerialDescriptor, vararg typeParams: KSerializer<*>): StructureEncoder
-        val beginFunc = kOutputSmallClass.referenceMethod(CallingConventions.begin) // todo: retrieve from actual encoder instead
+        val beginFunc = encoderClass.referenceMethod(CallingConventions.begin) { it.valueParameters.size == 1 }
 
-        val call = irCall(beginFunc, type = beginFunc.descriptor.returnType!!.toIrType()).mapValueParametersIndexed { i, parameterDescriptor ->
-            if (i == 0) irGet(localSerialDesc) else IrVarargImpl(
-                startOffset,
-                endOffset,
-                parameterDescriptor.type.toIrType(),
-                parameterDescriptor.varargElementType!!.toIrType()
-            )
+        val call = irCall(beginFunc, type = beginFunc.owner.returnType).mapValueParametersIndexed { _, _ ->
+            irGet(localSerialDesc)
         }
         // can it be done in more concise way? e.g. additional builder function?
         call.dispatchReceiver = irGet(saveFunc.valueParameters[0])
@@ -309,7 +320,7 @@ open class SerializerIrGenerator(val irClass: IrClass, final override val compil
             else -> null
         }
         return if (defaultPrimitive == null)
-            irNull() to (compilerContext.builtIns.nullableAnyType)
+            irNull(compilerContext.irBuiltIns.anyNType) to (compilerContext.builtIns.nullableAnyType)
         else
             defaultPrimitive to kType
     }
@@ -325,7 +336,7 @@ open class SerializerIrGenerator(val irClass: IrClass, final override val compil
         fun IrVariable.get() = irGet(this)
 
         val inputClass = serializerDescriptor.getClassFromSerializationPackage(STRUCTURE_DECODER_CLASS)
-        val inputSmallClass = serializerDescriptor.getClassFromSerializationPackage(DECODER_CLASS)
+        val decoderClass = serializerDescriptor.getClassFromSerializationPackage(DECODER_CLASS)
         val descriptorGetterSymbol = compilerContext.symbolTable.referenceFunction(anySerialDescProperty?.getter!!) //???
         val localSerialDesc = irTemporary(irGet(descriptorGetterSymbol.owner.returnType, irThis(), descriptorGetterSymbol), "desc")
 
@@ -350,12 +361,11 @@ open class SerializerIrGenerator(val irClass: IrClass, final override val compil
         }
 
         //input = input.beginStructure(...)
-        val beginFunc = inputSmallClass.referenceMethod(CallingConventions.begin)
+        val beginFunc = decoderClass.referenceMethod(CallingConventions.begin) { it.valueParameters.size == 1 }
         val call = irInvoke(
             irGet(loadFunc.valueParameters[0]),
             beginFunc,
-            irGet(localSerialDesc),
-            irEmptyVararg(beginFunc.descriptor.valueParameters[1])
+            irGet(localSerialDesc)
         )
         val localInput = irTemporary(call, "input")
 
@@ -372,18 +382,21 @@ open class SerializerIrGenerator(val irClass: IrClass, final override val compil
                         property.type,
                         genericIndex = property.genericIndex
                     )
+                    val isSerializable = innerSerial != null
                     // todo: update
                     val decodeFuncToCall =
-                        (if (innerSerial != null) "${CallingConventions.decode}${sti.elementMethodPrefix}Serializable${CallingConventions.elementPostfix}"
+                        (if (isSerializable) "${CallingConventions.decode}${sti.elementMethodPrefix}Serializable${CallingConventions.elementPostfix}"
                         else "${CallingConventions.decode}${sti.elementMethodPrefix}${CallingConventions.elementPostfix}")
                             .let {
-                                inputClass.referenceMethod(it)
+                                inputClass.referenceMethod(it) { it.valueParameters.size == if (isSerializable) 4 else 2 }
                             }
                     val typeArgs =
                         if (decodeFuncToCall.descriptor.typeParameters.isNotEmpty()) listOf(property.type.toIrType()) else listOf()
                     val args = mutableListOf<IrExpression>(localSerialDesc.get(), irInt(index))
-                    if (innerSerial != null)
+                    if (innerSerial != null) {
                         args.add(innerSerial)
+                        args.add(localProps[index].get())
+                    }
                     // local$i = localInput.decode...(...)
                     +irSetVar(
                         localProps[index].symbol,

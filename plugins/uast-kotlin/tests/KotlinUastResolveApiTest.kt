@@ -5,22 +5,19 @@
 
 package org.jetbrains.uast.test.kotlin
 
-import com.intellij.openapi.util.registry.Registry
 import com.intellij.psi.PsiClassType
+import com.intellij.psi.PsiMethod
 import com.intellij.psi.PsiType
 import com.intellij.testFramework.LightProjectDescriptor
 import junit.framework.TestCase
 import org.jetbrains.kotlin.idea.test.KotlinLightCodeInsightFixtureTestCase
 import org.jetbrains.kotlin.idea.test.KotlinWithJdkAndRuntimeLightProjectDescriptor
 import org.jetbrains.kotlin.test.JUnit3WithIdeaConfigurationRunner
-import org.jetbrains.uast.UElement
-import org.jetbrains.uast.UQualifiedReferenceExpression
-import org.jetbrains.uast.getContainingUMethod
+import org.jetbrains.uast.*
 import org.jetbrains.uast.kotlin.KotlinUFunctionCallExpression
 import org.jetbrains.uast.test.env.kotlin.findElementByText
 import org.jetbrains.uast.test.env.kotlin.findElementByTextFromPsi
 import org.jetbrains.uast.test.env.kotlin.findUElementByTextFromPsi
-import org.jetbrains.uast.toUElement
 import org.junit.runner.RunWith
 
 @RunWith(JUnit3WithIdeaConfigurationRunner::class)
@@ -29,10 +26,6 @@ class KotlinUastResolveApiTest : KotlinLightCodeInsightFixtureTestCase() {
     override fun getProjectDescriptor(): LightProjectDescriptor =
         KotlinWithJdkAndRuntimeLightProjectDescriptor.INSTANCE
 
-    override fun setUp() {
-        super.setUp()
-        Registry.get("kotlin.uast.multiresolve.enabled").setValue(true, testRootDisposable)
-    }
 
     fun testResolveStringFromUast() {
         val file = myFixture.addFileToProject(
@@ -292,5 +285,60 @@ class KotlinUastResolveApiTest : KotlinLightCodeInsightFixtureTestCase() {
         TestCase.assertEquals(PsiType.INT, functionCall.getExpressionType())
     }
 
+    fun testLocalResolve() {
+        myFixture.configureByText(
+            "MyClass.kt", """
+            fun foo() {
+                fun bar() {}
+                
+                ba<caret>r()
+            }
+        """
+        )
+
+
+        val uCallExpression = myFixture.file.findElementAt(myFixture.caretOffset).toUElement().getUCallExpression().orFail("cant convert to UCallExpression")
+        val resolved = uCallExpression.resolve().orFail("cant resolve from $uCallExpression")
+        TestCase.assertEquals("bar", resolved.name)
+    }
+
+
+    fun testResolveCompiledAnnotation() {
+        myFixture.configureByText(
+            "MyClass.kt", """
+            @Deprecated(message = "deprecated")    
+            fun foo() {}
+        """
+        )
+
+        val compiledAnnotationParameter = myFixture.file.toUElement()!!.findElementByTextFromPsi<USimpleNameReferenceExpression>("message")
+        val resolved = compiledAnnotationParameter.resolve() as PsiMethod
+        TestCase.assertEquals("message", resolved.name)
+    }
+
+    fun testAssigningArrayElementType() {
+        myFixture.configureByText(
+            "MyClass.kt", """ 
+            fun foo() {
+                val arr = arrayOfNulls<List<*>>(10)
+                arr[0] = emptyList<Any>()
+                
+                val lst = mutableListOf<List<*>>()
+                lst[0] = emptyList<Any>()
+            }
+        """
+        )
+
+        val uFile = myFixture.file.toUElement()!!
+
+        TestCase.assertEquals(
+            "PsiType:List<?>",
+            uFile.findElementByTextFromPsi<UExpression>("arr[0]").getExpressionType().toString()
+        )
+        TestCase.assertEquals(
+            "PsiType:List<?>",
+            uFile.findElementByTextFromPsi<UExpression>("lst[0]").getExpressionType().toString()
+        )
+    }
 }
 

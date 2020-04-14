@@ -1,19 +1,18 @@
 /*
- * Copyright 2010-2019 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2020 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.gradle.targets.js.nodejs
 
-import org.gradle.api.tasks.AbstractExecTask
-import org.gradle.api.tasks.Input
-import org.gradle.api.tasks.Internal
-import org.gradle.api.tasks.TaskProvider
+import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.tasks.*
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinJsCompilation
 import org.jetbrains.kotlin.gradle.targets.js.RequiredKotlinJsDependency
 import org.jetbrains.kotlin.gradle.targets.js.npm.RequiresNpmDependencies
 import org.jetbrains.kotlin.gradle.targets.js.npm.npmProject
 import org.jetbrains.kotlin.gradle.tasks.registerTask
+import org.jetbrains.kotlin.gradle.utils.newFileProperty
 
 open class NodeJsExec : AbstractExecTask<NodeJsExec>(NodeJsExec::class.java), RequiresNpmDependencies {
     @get:Internal
@@ -24,13 +23,18 @@ open class NodeJsExec : AbstractExecTask<NodeJsExec>(NodeJsExec::class.java), Re
 
     init {
         onlyIf {
-            compilation.compileKotlinTask.outputFile
-                .exists()
+            !inputFileProperty.isPresent || inputFileProperty.asFile.map {
+                it.exists()
+            }.get()
         }
     }
 
     @Input
     var sourceMapStackTraces = true
+
+    @Optional
+    @InputFile
+    val inputFileProperty: RegularFileProperty = project.newFileProperty()
 
     @get:Internal
     override val nodeModulesRequired: Boolean
@@ -45,6 +49,10 @@ open class NodeJsExec : AbstractExecTask<NodeJsExec>(NodeJsExec::class.java), Re
         }
 
     override fun exec() {
+        if (inputFileProperty.isPresent) {
+            args(inputFileProperty.asFile.get())
+        }
+
         if (sourceMapStackTraces) {
             val sourceMapSupportArgs = mutableListOf(
                 "--require",
@@ -77,7 +85,6 @@ open class NodeJsExec : AbstractExecTask<NodeJsExec>(NodeJsExec::class.java), Re
 
                 val compileKotlinTask = compilation.compileKotlinTask
                 it.dependsOn(nodeJs.npmInstallTask, compileKotlinTask)
-                it.args(compileKotlinTask.outputFile)
 
                 it.configuration()
             }

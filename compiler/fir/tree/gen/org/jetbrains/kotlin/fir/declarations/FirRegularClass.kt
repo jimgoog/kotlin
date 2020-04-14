@@ -6,9 +6,11 @@
 package org.jetbrains.kotlin.fir.declarations
 
 import org.jetbrains.kotlin.descriptors.ClassKind
+import org.jetbrains.kotlin.fir.FirPureAbstractElement
 import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.FirSourceElement
 import org.jetbrains.kotlin.fir.expressions.FirAnnotationCall
+import org.jetbrains.kotlin.fir.references.FirControlFlowGraphReference
 import org.jetbrains.kotlin.fir.scopes.FirScopeProvider
 import org.jetbrains.kotlin.fir.symbols.impl.FirRegularClassSymbol
 import org.jetbrains.kotlin.fir.types.FirTypeRef
@@ -20,24 +22,30 @@ import org.jetbrains.kotlin.fir.visitors.*
  * DO NOT MODIFY IT MANUALLY
  */
 
-interface FirRegularClass : FirMemberDeclaration, FirTypeParametersOwner, FirClass<FirRegularClass> {
-    override val source: FirSourceElement?
-    override val session: FirSession
-    override val resolvePhase: FirResolvePhase
-    override val name: Name
-    override val annotations: List<FirAnnotationCall>
-    override val typeParameters: List<FirTypeParameter>
-    override val status: FirDeclarationStatus
-    override val classKind: ClassKind
-    override val declarations: List<FirDeclaration>
-    override val scopeProvider: FirScopeProvider
-    override val symbol: FirRegularClassSymbol
-    val companionObject: FirRegularClass?
-    override val superTypeRefs: List<FirTypeRef>
+abstract class FirRegularClass : FirPureAbstractElement(), FirMemberDeclaration, FirTypeParameterRefsOwner, FirClass<FirRegularClass> {
+    abstract override val source: FirSourceElement?
+    abstract override val session: FirSession
+    abstract override val resolvePhase: FirResolvePhase
+    abstract override val annotations: List<FirAnnotationCall>
+    abstract override val typeParameters: List<FirTypeParameterRef>
+    abstract override val status: FirDeclarationStatus
+    abstract override val classKind: ClassKind
+    abstract override val declarations: List<FirDeclaration>
+    abstract override val scopeProvider: FirScopeProvider
+    abstract val name: Name
+    abstract override val symbol: FirRegularClassSymbol
+    abstract val companionObject: FirRegularClass?
+    abstract val hasLazyNestedClassifiers: Boolean
+    abstract override val superTypeRefs: List<FirTypeRef>
+    abstract val controlFlowGraphReference: FirControlFlowGraphReference
 
     override fun <R, D> accept(visitor: FirVisitor<R, D>, data: D): R = visitor.visitRegularClass(this, data)
 
-    override fun replaceSuperTypeRefs(newSuperTypeRefs: List<FirTypeRef>)
+    abstract override fun replaceSuperTypeRefs(newSuperTypeRefs: List<FirTypeRef>)
 
-    override fun <D> transformStatus(transformer: FirTransformer<D>, data: D): FirRegularClass
+    abstract override fun <D> transformAnnotations(transformer: FirTransformer<D>, data: D): FirRegularClass
+
+    abstract override fun <D> transformStatus(transformer: FirTransformer<D>, data: D): FirRegularClass
+
+    abstract fun <D> transformControlFlowGraphReference(transformer: FirTransformer<D>, data: D): FirRegularClass
 }

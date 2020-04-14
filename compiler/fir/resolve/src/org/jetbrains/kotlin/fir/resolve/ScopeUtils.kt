@@ -6,13 +6,13 @@
 package org.jetbrains.kotlin.fir.resolve
 
 import org.jetbrains.kotlin.fir.FirSession
-import org.jetbrains.kotlin.fir.declarations.FirAnonymousObject
-import org.jetbrains.kotlin.fir.declarations.FirClass
-import org.jetbrains.kotlin.fir.declarations.FirRegularClass
-import org.jetbrains.kotlin.fir.declarations.FirTypeParametersOwner
+import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.resolve.substitution.substitutorByMap
 import org.jetbrains.kotlin.fir.scopes.FirScope
-import org.jetbrains.kotlin.fir.scopes.impl.*
+import org.jetbrains.kotlin.fir.scopes.impl.FirCompositeScope
+import org.jetbrains.kotlin.fir.scopes.impl.FirIntegerLiteralTypeScope
+import org.jetbrains.kotlin.fir.scopes.impl.FirStandardOverrideChecker
+import org.jetbrains.kotlin.fir.scopes.impl.FirSuperTypeScope
 import org.jetbrains.kotlin.fir.scopes.scope
 import org.jetbrains.kotlin.fir.types.*
 import org.jetbrains.kotlin.fir.types.impl.ConeClassLikeTypeImpl
@@ -25,12 +25,9 @@ fun ConeKotlinType.scope(useSiteSession: FirSession, scopeSession: ScopeSession)
             val fullyExpandedType = fullyExpandedType(useSiteSession)
             val fir = fullyExpandedType.lookupTag.toSymbol(useSiteSession)?.fir as? FirClass<*> ?: return null
 
-            val substitution = when (fir) {
-                is FirTypeParametersOwner -> createSubstitution(fir.typeParameters, fullyExpandedType.typeArguments, useSiteSession)
-                else -> emptyMap()
-            }
+            val substitution = createSubstitution(fir.typeParameters, fullyExpandedType.typeArguments, useSiteSession)
 
-            fir.scope(substitutorByMap(substitution), useSiteSession, scopeSession)
+            fir.scope(substitutorByMap(substitution), useSiteSession, scopeSession, skipPrivateMembers = false)
         }
         is ConeTypeParameterType -> {
             // TODO: support LibraryTypeParameterSymbol or get rid of it
@@ -43,7 +40,9 @@ fun ConeKotlinType.scope(useSiteSession: FirSession, scopeSession: ScopeSession)
         }
         is ConeRawType -> lowerBound.scope(useSiteSession, scopeSession)
         is ConeFlexibleType -> lowerBound.scope(useSiteSession, scopeSession)
-        is ConeIntersectionType -> FirCompositeScope(
+        is ConeIntersectionType -> FirSuperTypeScope.prepareSupertypeScope(
+            useSiteSession,
+            FirStandardOverrideChecker(useSiteSession),
             intersectedTypes.mapNotNullTo(mutableListOf()) {
                 it.scope(useSiteSession, scopeSession)
             }
@@ -53,13 +52,16 @@ fun ConeKotlinType.scope(useSiteSession: FirSession, scopeSession: ScopeSession)
 
             @Suppress("USELESS_CAST") // TODO: remove once fixed: https://youtrack.jetbrains.com/issue/KT-35635
             scopeSession.getOrBuild(
-                FirIntegerLiteralTypeScope.ILT_SYMBOL,
+                when {
+                    isUnsigned -> FirIntegerLiteralTypeScope.ILTKey.Unsigned
+                    else -> FirIntegerLiteralTypeScope.ILTKey.Signed
+                },
                 FirIntegerLiteralTypeScope.SCOPE_SESSION_KEY
             ) {
-                FirIntegerLiteralTypeScope(useSiteSession)
+                FirIntegerLiteralTypeScope(useSiteSession, isUnsigned)
             } as FirScope
         }
-        else -> error("Failed type $this")
+        else -> null
     }
 }
 
@@ -76,8 +78,8 @@ fun FirRegularClass.defaultType(): ConeClassLikeTypeImpl {
     )
 }
 
-fun FirAnonymousObject.defaultType(): ConeClassLikeTypeImpl {
-    return ConeClassLikeTypeImpl(
+fun FirAnonymousObject.defaultType(): ConeClassLikeType {
+    return this.typeRef.coneTypeSafe() ?: ConeClassLikeTypeImpl(
         symbol.toLookupTag(),
         emptyArray(),
         isNullable = false

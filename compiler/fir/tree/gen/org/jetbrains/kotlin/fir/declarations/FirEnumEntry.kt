@@ -5,7 +5,6 @@
 
 package org.jetbrains.kotlin.fir.declarations
 
-import org.jetbrains.kotlin.fir.FirPureAbstractElement
 import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.FirSourceElement
 import org.jetbrains.kotlin.fir.expressions.FirAnnotationCall
@@ -22,7 +21,7 @@ import org.jetbrains.kotlin.fir.visitors.*
  * DO NOT MODIFY IT MANUALLY
  */
 
-abstract class FirEnumEntry : FirPureAbstractElement(), FirVariable<FirEnumEntry>, FirCallableMemberDeclaration<FirEnumEntry> {
+abstract class FirEnumEntry : FirVariable<FirEnumEntry>(), FirCallableMemberDeclaration<FirEnumEntry> {
     abstract override val source: FirSourceElement?
     abstract override val session: FirSession
     abstract override val resolvePhase: FirResolvePhase
@@ -38,7 +37,7 @@ abstract class FirEnumEntry : FirPureAbstractElement(), FirVariable<FirEnumEntry
     abstract override val getter: FirPropertyAccessor?
     abstract override val setter: FirPropertyAccessor?
     abstract override val annotations: List<FirAnnotationCall>
-    abstract override val typeParameters: List<FirTypeParameter>
+    abstract override val typeParameters: List<FirTypeParameterRef>
     abstract override val status: FirDeclarationStatus
     abstract override val containerSource: DeserializedContainerSource?
 
@@ -50,9 +49,13 @@ abstract class FirEnumEntry : FirPureAbstractElement(), FirVariable<FirEnumEntry
 
     abstract override fun <D> transformInitializer(transformer: FirTransformer<D>, data: D): FirEnumEntry
 
+    abstract override fun <D> transformDelegate(transformer: FirTransformer<D>, data: D): FirEnumEntry
+
     abstract override fun <D> transformGetter(transformer: FirTransformer<D>, data: D): FirEnumEntry
 
     abstract override fun <D> transformSetter(transformer: FirTransformer<D>, data: D): FirEnumEntry
+
+    abstract override fun <D> transformAnnotations(transformer: FirTransformer<D>, data: D): FirEnumEntry
 
     abstract override fun <D> transformStatus(transformer: FirTransformer<D>, data: D): FirEnumEntry
 

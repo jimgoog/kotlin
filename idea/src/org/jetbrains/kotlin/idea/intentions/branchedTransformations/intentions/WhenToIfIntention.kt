@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2020 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -8,13 +8,16 @@ package org.jetbrains.kotlin.idea.intentions.branchedTransformations.intentions
 import com.intellij.codeInsight.intention.LowPriorityAction
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.util.TextRange
+import org.jetbrains.kotlin.idea.KotlinBundle
 import org.jetbrains.kotlin.idea.intentions.SelfTargetingRangeIntention
 import org.jetbrains.kotlin.idea.intentions.branchedTransformations.combineWhenConditions
 import org.jetbrains.kotlin.idea.util.CommentSaver
 import org.jetbrains.kotlin.psi.*
 
-class WhenToIfIntention : SelfTargetingRangeIntention<KtWhenExpression>(KtWhenExpression::class.java, "Replace 'when' with 'if'"),
-    LowPriorityAction {
+class WhenToIfIntention : SelfTargetingRangeIntention<KtWhenExpression>(
+    KtWhenExpression::class.java,
+    KotlinBundle.lazyMessage("replace.when.with.if")
+), LowPriorityAction {
     override fun applicabilityRange(element: KtWhenExpression): TextRange? {
         val entries = element.entries
         if (entries.isEmpty()) return null
@@ -46,11 +49,13 @@ class WhenToIfIntention : SelfTargetingRangeIntention<KtWhenExpression>(KtWhenEx
                     if (branch is KtIfExpression) {
                         appendFixedText("{ ")
                     }
+
                     appendExpression(branch)
                     if (branch is KtIfExpression) {
                         appendFixedText(" }")
                     }
                 }
+
                 if (i != entries.lastIndex) {
                     appendFixedText("\n")
                 }

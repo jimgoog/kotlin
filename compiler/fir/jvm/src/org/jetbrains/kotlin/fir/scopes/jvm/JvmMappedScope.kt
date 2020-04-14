@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2020 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -7,53 +7,97 @@ package org.jetbrains.kotlin.fir.scopes.jvm
 
 import org.jetbrains.kotlin.builtins.jvm.JvmBuiltInsSettings
 import org.jetbrains.kotlin.fir.declarations.FirRegularClass
+import org.jetbrains.kotlin.fir.resolve.substitution.ConeSubstitutor
 import org.jetbrains.kotlin.fir.scopes.FirScope
-import org.jetbrains.kotlin.fir.scopes.ProcessorAction
-import org.jetbrains.kotlin.fir.symbols.impl.FirCallableSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirClassifierSymbol
+import org.jetbrains.kotlin.fir.symbols.impl.FirConstructorSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirFunctionSymbol
+import org.jetbrains.kotlin.fir.symbols.impl.FirVariableSymbol
 import org.jetbrains.kotlin.name.Name
 
 class JvmMappedScope(
     private val declaredMemberScope: FirScope,
     private val javaMappedClassUseSiteScope: FirScope,
-    private val whiteListSignaturesByName: Map<Name, List<String>>
+    private val signatures: Signatures
 ) : FirScope() {
 
-    override fun processFunctionsByName(name: Name, processor: (FirFunctionSymbol<*>) -> ProcessorAction): ProcessorAction {
-        val whiteListSignatures = whiteListSignaturesByName[name]
+    override fun processFunctionsByName(name: Name, processor: (FirFunctionSymbol<*>) -> Unit) {
+        val whiteListSignatures = signatures.whiteListSignaturesByName[name]
             ?: return declaredMemberScope.processFunctionsByName(name, processor)
-        if (!javaMappedClassUseSiteScope.processFunctionsByName(name) { symbol ->
+        javaMappedClassUseSiteScope.processFunctionsByName(name) { symbol ->
+            val jvmSignature = symbol.fir.computeJvmDescriptor()
+                .replace("kotlin/Any", "java/lang/Object")
+                .replace("kotlin/String", "java/lang/String")
+            if (jvmSignature in whiteListSignatures) {
+                processor(symbol)
+            }
+        }
+
+
+        declaredMemberScope.processFunctionsByName(name, processor)
+    }
+
+    override fun processDeclaredConstructors(processor: (FirConstructorSymbol) -> Unit) {
+        val constructorBlackList = signatures.constructorBlackList
+        if (constructorBlackList.isNotEmpty()) {
+            javaMappedClassUseSiteScope.processDeclaredConstructors { symbol ->
                 val jvmSignature = symbol.fir.computeJvmDescriptor()
-                if (jvmSignature !in whiteListSignatures) {
-                    ProcessorAction.NEXT
-                } else {
+                    .replace("kotlin/Any", "java/lang/Object")
+                    .replace("kotlin/String", "java/lang/String")
+                    .replace("kotlin/Throwable", "java/lang/Throwable")
+                if (jvmSignature !in constructorBlackList) {
                     processor(symbol)
                 }
             }
-        ) return ProcessorAction.STOP
+        } else {
+            javaMappedClassUseSiteScope.processDeclaredConstructors(processor)
+        }
 
-        return declaredMemberScope.processFunctionsByName(name, processor)
+        declaredMemberScope.processDeclaredConstructors(processor)
     }
 
-    override fun processPropertiesByName(name: Name, processor: (FirCallableSymbol<*>) -> ProcessorAction): ProcessorAction {
-        return declaredMemberScope.processPropertiesByName(name, processor)
+    override fun processPropertiesByName(name: Name, processor: (FirVariableSymbol<*>) -> Unit) {
+        declaredMemberScope.processPropertiesByName(name, processor)
     }
 
-    override fun processClassifiersByName(name: Name, processor: (FirClassifierSymbol<*>) -> ProcessorAction): ProcessorAction {
-        return declaredMemberScope.processClassifiersByName(name, processor)
+    override fun processClassifiersByNameWithSubstitution(name: Name, processor: (FirClassifierSymbol<*>, ConeSubstitutor) -> Unit) {
+        declaredMemberScope.processClassifiersByNameWithSubstitution(name, processor)
     }
 
     companion object {
-        fun prepareSignatures(klass: FirRegularClass): Map<Name, List<String>> {
+        data class Signatures(val whiteListSignaturesByName: Map<Name, Set<String>>, val constructorBlackList: Set<String>) {
+            fun isEmpty() = whiteListSignaturesByName.isEmpty() && constructorBlackList.isEmpty()
+            fun isNotEmpty() = !isEmpty()
+        }
+
+        // NOTE: No-arg constructors
+        private val additionalConstructorBlackList = setOf(
+            "java/lang/String.<init>()V",
+            "java/lang/Throwable.<init>()V",
+            "java/lang/Throwable.<init>(Ljava/lang/String;Ljava/lang/Throwable;)V",
+            "java/lang/Throwable.<init>(Ljava/lang/Throwable;)V",
+            "java/lang/Throwable.<init>(Ljava/lang/String;)V"
+        )
+
+        fun prepareSignatures(klass: FirRegularClass): Signatures {
+
             val signaturePrefix = klass.symbol.classId.toString()
-            val filteredSignatures = JvmBuiltInsSettings.WHITE_LIST_METHOD_SIGNATURES.filter { signature ->
+            val whiteListSignaturesByName = mutableMapOf<Name, MutableSet<String>>()
+            JvmBuiltInsSettings.WHITE_LIST_METHOD_SIGNATURES.filter { signature ->
                 signature.startsWith(signaturePrefix)
             }.map { signature ->
                 // +1 to delete dot before function name
                 signature.substring(signaturePrefix.length + 1)
+            }.forEach {
+                whiteListSignaturesByName.getOrPut(Name.identifier(it.substringBefore("("))) { mutableSetOf() }.add(it)
             }
-            return filteredSignatures.groupBy { Name.identifier(it.substringBefore("(")) }
+
+            val constructorBlackList =
+                (JvmBuiltInsSettings.BLACK_LIST_CONSTRUCTOR_SIGNATURES + additionalConstructorBlackList)
+                    .filter { it.startsWith(signaturePrefix) }
+                    .mapTo(mutableSetOf()) { it.substring(signaturePrefix.length + 1) }
+
+            return Signatures(whiteListSignaturesByName, constructorBlackList)
         }
     }
 }

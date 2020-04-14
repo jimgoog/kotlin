@@ -15,8 +15,8 @@ import org.jetbrains.kotlin.fir.visitors.*
  * DO NOT MODIFY IT MANUALLY
  */
 
-class FirImplicitTypeRefImpl(
-    override val source: FirSourceElement?
+internal class FirImplicitTypeRefImpl(
+    override val source: FirSourceElement?,
 ) : FirImplicitTypeRef() {
     override val annotations: List<FirAnnotationCall> get() = emptyList()
 
@@ -24,6 +24,10 @@ class FirImplicitTypeRefImpl(
     }
 
     override fun <D> transformChildren(transformer: FirTransformer<D>, data: D): FirImplicitTypeRefImpl {
+        return this
+    }
+
+    override fun <D> transformAnnotations(transformer: FirTransformer<D>, data: D): FirImplicitTypeRefImpl {
         return this
     }
 }

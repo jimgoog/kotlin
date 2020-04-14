@@ -28,10 +28,12 @@ abstract class FirExpressionWithSmartcast : FirQualifiedAccessExpression() {
     abstract override val extensionReceiver: FirExpression
     abstract override val calleeReference: FirReference
     abstract val originalExpression: FirQualifiedAccessExpression
-    abstract val typesFromSmartcast: Collection<ConeKotlinType>
+    abstract val typesFromSmartCast: Collection<ConeKotlinType>
     abstract val originalType: FirTypeRef
 
     override fun <R, D> accept(visitor: FirVisitor<R, D>, data: D): R = visitor.visitExpressionWithSmartcast(this, data)
+
+    abstract override fun <D> transformAnnotations(transformer: FirTransformer<D>, data: D): FirExpressionWithSmartcast
 
     abstract override fun <D> transformTypeArguments(transformer: FirTransformer<D>, data: D): FirExpressionWithSmartcast
 

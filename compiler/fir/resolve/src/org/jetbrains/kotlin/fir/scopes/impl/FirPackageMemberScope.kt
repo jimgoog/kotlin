@@ -7,12 +7,9 @@ package org.jetbrains.kotlin.fir.scopes.impl
 
 import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.resolve.FirSymbolProvider
+import org.jetbrains.kotlin.fir.resolve.substitution.ConeSubstitutor
 import org.jetbrains.kotlin.fir.scopes.FirScope
-import org.jetbrains.kotlin.fir.scopes.ProcessorAction
-import org.jetbrains.kotlin.fir.symbols.impl.FirCallableSymbol
-import org.jetbrains.kotlin.fir.symbols.impl.FirClassifierSymbol
-import org.jetbrains.kotlin.fir.symbols.impl.FirFunctionSymbol
-import org.jetbrains.kotlin.fir.symbols.impl.FirPropertySymbol
+import org.jetbrains.kotlin.fir.symbols.impl.*
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
@@ -25,11 +22,11 @@ class FirPackageMemberScope(val fqName: FqName, val session: FirSession) : FirSc
 
     private val callableCache = mutableMapOf<Name, List<FirCallableSymbol<*>>>()
 
-    override fun processClassifiersByName(
+    override fun processClassifiersByNameWithSubstitution(
         name: Name,
-        processor: (FirClassifierSymbol<*>) -> ProcessorAction
-    ): ProcessorAction {
-        if (name.asString().isEmpty()) return ProcessorAction.NONE
+        processor: (FirClassifierSymbol<*>, ConeSubstitutor) -> Unit
+    ) {
+        if (name.asString().isEmpty()) return
 
 
         val symbol = classifierCache.getOrPut(name) {
@@ -37,34 +34,30 @@ class FirPackageMemberScope(val fqName: FqName, val session: FirSession) : FirSc
             symbolProvider.getClassLikeSymbolByFqName(unambiguousFqName)
         }
 
-        return if (symbol != null) {
-            processor(symbol)
-        } else {
-            ProcessorAction.NONE
+        if (symbol != null) {
+            processor(symbol, ConeSubstitutor.Empty)
         }
     }
 
-    override fun processFunctionsByName(name: Name, processor: (FirFunctionSymbol<*>) -> ProcessorAction): ProcessorAction {
+    override fun processFunctionsByName(name: Name, processor: (FirFunctionSymbol<*>) -> Unit) {
         val symbols = callableCache.getOrPut(name) {
             symbolProvider.getTopLevelCallableSymbols(fqName, name)
         }
         for (symbol in symbols) {
-            if (symbol is FirFunctionSymbol<*> && !processor(symbol)) {
-                return ProcessorAction.STOP
+            if (symbol is FirFunctionSymbol<*>) {
+                processor(symbol)
             }
         }
-        return ProcessorAction.NEXT
     }
 
-    override fun processPropertiesByName(name: Name, processor: (FirCallableSymbol<*>) -> ProcessorAction): ProcessorAction {
+    override fun processPropertiesByName(name: Name, processor: (FirVariableSymbol<*>) -> Unit) {
         val symbols = callableCache.getOrPut(name) {
             symbolProvider.getTopLevelCallableSymbols(fqName, name)
         }
         for (symbol in symbols) {
-            if (symbol is FirPropertySymbol && !processor(symbol)) {
-                return ProcessorAction.STOP
+            if (symbol is FirPropertySymbol) {
+                processor(symbol)
             }
         }
-        return ProcessorAction.NEXT
     }
 }

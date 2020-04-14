@@ -15,7 +15,6 @@ import org.jetbrains.kotlin.codegen.optimization.FixStackWithLabelNormalizationM
 import org.jetbrains.kotlin.codegen.optimization.common.*
 import org.jetbrains.kotlin.codegen.optimization.fixStack.peek
 import org.jetbrains.kotlin.codegen.optimization.fixStack.top
-import org.jetbrains.kotlin.codegen.optimization.transformer.MethodTransformer
 import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.descriptors.FunctionDescriptor
 import org.jetbrains.kotlin.descriptors.ParameterDescriptor
@@ -132,8 +131,6 @@ class MethodInliner(
         processReturns(resultNode, returnLabelOwner, remapReturn, end)
         //flush transformed node to output
         resultNode.accept(SkipMaxAndEndVisitor(adapter))
-
-        sourceMapper.endMapping()
         return result
     }
 
@@ -218,10 +215,8 @@ class MethodInliner(
                     val info = invokeCall.functionalArgument
 
                     if (info !is LambdaInfo) {
-                        if (info == NonInlineableArgumentForInlineableSuspendParameter) {
-                            super.visitMethodInsn(Opcodes.INVOKESTATIC, NOINLINE_CALL_MARKER, NOINLINE_CALL_MARKER, "()V", false)
-                        }
                         //noninlinable lambda
+                        markNoinlineLambdaIfSuspend(mv, info)
                         super.visitMethodInsn(opcode, owner, name, desc, itf)
                         return
                     }
@@ -284,10 +279,9 @@ class MethodInliner(
 
                     val childSourceMapper =
                         if (inliningContext.classRegeneration && !inliningContext.isInliningLambda)
-                            NestedSourceMapper(sourceMapper, lambdaSMAP.intervals, lambdaSMAP.sourceInfo)
-                        else if (info is DefaultLambda) {
-                            NestedSourceMapper(sourceMapper.parent!!, lambdaSMAP.intervals, lambdaSMAP.sourceInfo)
-                        } else InlineLambdaSourceMapper(sourceMapper.parent!!, info.node)
+                            NestedSourceMapper(sourceMapper, lambdaSMAP)
+                        else
+                            NestedSourceMapper(sourceMapper.parent!!, lambdaSMAP, sameFile = info !is DefaultLambda)
 
                     val inliner = MethodInliner(
                         info.node.node, lambdaParameters, inliningContext.subInlineLambda(info),
@@ -308,7 +302,6 @@ class MethodInliner(
                         .put(OBJECT_TYPE, erasedInvokeFunction.returnType, this)
                     setLambdaInlining(false)
                     addInlineMarker(this, false)
-                    childSourceMapper.endMapping()
                     inlineOnlySmapSkipper?.markCallSiteLineNumber(remappingMethodAdapter)
                 } else if (isAnonymousConstructorCall(owner, name)) { //TODO add method
                     //TODO add proper message
@@ -367,8 +360,6 @@ class MethodInliner(
                     ReifiedTypeInliner.isNeedClassReificationMarker(MethodInsnNode(opcode, owner, name, desc, false))
                 ) {
                     //we shouldn't process here content of inlining lambda it should be reified at external level except default lambdas
-                } else if (owner == NOINLINE_CALL_MARKER && name == NOINLINE_CALL_MARKER) {
-                    // do not generate multiple markers on single invoke
                 } else {
                     super.visitMethodInsn(opcode, owner, name, desc, itf)
                 }
@@ -389,21 +380,8 @@ class MethodInliner(
 
         node.accept(lambdaInliner)
 
-        return surroundInvokesWithSuspendMarkersIfNeeded(resultNode)
-    }
-
-    private fun surroundInvokesWithSuspendMarkersIfNeeded(node: MethodNode): MethodNode {
-        val markers = node.instructions.asSequence().filter { it.isNoinlineCallMarker() }.toList()
-        if (markers.isEmpty()) return node
-        val invokes = markers.map { it.next as MethodInsnNode }
-        node.instructions.removeAll(markers)
-
-        val sourceFrames = MethodTransformer.analyze(inlineCallSiteInfo.ownerClassName, node, SourceInterpreter())
-        val toSurround = invokes.mapNotNull { insn ->
-            findReceiverOfInvoke(sourceFrames[node.instructions.indexOf(insn)], insn)?.let { insn to it }
-        }
-        surroundInvokesWithSuspendMarkers(node, toSurround)
-        return node
+        surroundInvokesWithSuspendMarkersIfNeeded(resultNode)
+        return resultNode
     }
 
     private fun isDefaultLambdaWithReification(lambdaInfo: LambdaInfo) =
@@ -859,9 +837,20 @@ class MethodInliner(
         needReification: Boolean,
         capturesAnonymousObjectThatMustBeRegenerated: Boolean
     ): AnonymousObjectTransformationInfo {
-
+        // In objects inside non-default inline lambdas, all reified type parameters are free (not from the function
+        // we're inlining into) so there's nothing to reify:
+        //
+        //     inline fun <reified T> f(x: () -> KClass<T> = { { T::class }() }) = x()
+        //     fun a() = f<Int>()
+        //     fun b() = f<Int> { { Int::class }() } // non-default lambda
+        //     inline fun <reified V> c() = f<V> { { V::class }() }
+        //
+        // -- in a(), the default inline lambda captures T so a regeneration is needed; but in b() and c(), the non-default
+        // inline lambda cannot possibly reference it, while V is not yet bound so regenerating the object while inlining
+        // the lambda into f() is pointless.
+        val inNonDefaultLambda = inliningContext.isInliningLambda && inliningContext.lambdaInfo !is DefaultLambda
         val info = AnonymousObjectTransformationInfo(
-            anonymousType, needReification, lambdaMapping,
+            anonymousType, needReification && !inNonDefaultLambda, lambdaMapping,
             inliningContext.classRegeneration,
             isAlreadyRegenerated(anonymousType),
             desc,
@@ -894,6 +883,8 @@ class MethodInliner(
                 getFunctionalArgumentIfExists((insnNode as VarInsnNode).`var`)
             insnNode is FieldInsnNode && insnNode.name.startsWith(CAPTURED_FIELD_FOLD_PREFIX) ->
                 findCapturedField(insnNode, nodeRemapper).functionalArgument
+            insnNode is FieldInsnNode && insnNode.isSuspendLambdaCapturedByOuterObjectOrLambda(inliningContext) ->
+                NonInlineableArgumentForInlineableParameterCalledInSuspend
             else ->
                 null
         }

@@ -13,7 +13,9 @@ import org.jetbrains.kotlin.descriptors.annotations.Annotations
 import org.jetbrains.kotlin.descriptors.annotations.FilteredAnnotations
 import org.jetbrains.kotlin.resolve.calls.inference.ConstraintSystemBuilder
 import org.jetbrains.kotlin.resolve.calls.inference.addSubsystemFromArgument
-import org.jetbrains.kotlin.resolve.calls.inference.model.*
+import org.jetbrains.kotlin.resolve.calls.inference.model.ConstraintStorage
+import org.jetbrains.kotlin.resolve.calls.inference.model.CoroutinePosition
+import org.jetbrains.kotlin.resolve.calls.inference.model.LambdaArgumentConstraintPosition
 import org.jetbrains.kotlin.resolve.calls.model.*
 import org.jetbrains.kotlin.types.UnwrappedType
 import org.jetbrains.kotlin.types.model.*
@@ -51,7 +53,7 @@ class PostponedArgumentsAnalyzer(
 
             is LambdaWithTypeVariableAsExpectedTypeAtom ->
                 analyzeLambda(
-                    c, resolutionCallbacks, argument.transformToResolvedLambda(c.getBuilder()), diagnosticsHolder
+                    c, resolutionCallbacks, argument.transformToResolvedLambda(c.getBuilder(), diagnosticsHolder), diagnosticsHolder
                 )
 
             is ResolvedCallableReferenceAtom ->
@@ -118,37 +120,58 @@ class PostponedArgumentsAnalyzer(
             else FilteredAnnotations(annotations, true) { it != KotlinBuiltIns.FQ_NAMES.extensionFunctionType }
         }
 
-        val (returnArguments, inferenceSession) = resolutionCallbacks.analyzeAndGetLambdaReturnArguments(
-            lambda.atom,
-            lambda.isSuspend,
-            receiver,
-            parameters,
-            expectedTypeForReturnArguments,
-            convertedAnnotations ?: Annotations.EMPTY,
-            stubsForPostponedVariables.cast()
-        )
-
-        returnArguments.forEach { c.addSubsystemFromArgument(it) }
-
-        val subResolvedKtPrimitives = returnArguments.map {
-            resolveKtPrimitive(
-                c.getBuilder(), it, lambda.returnType.let(::substitute), diagnosticHolder, isReceiver = false
+        val (returnArgumentsInfo, inferenceSession, hasInapplicableCallForBuilderInference) =
+            resolutionCallbacks.analyzeAndGetLambdaReturnArguments(
+                lambda.atom,
+                lambda.isSuspend,
+                receiver,
+                parameters,
+                expectedTypeForReturnArguments,
+                convertedAnnotations ?: Annotations.EMPTY,
+                stubsForPostponedVariables.cast()
             )
+
+        if (hasInapplicableCallForBuilderInference) {
+            c.getBuilder().removePostponedVariables()
+            return
         }
 
-        if (returnArguments.isEmpty()) {
+        val returnArguments = returnArgumentsInfo.nonErrorArguments
+        returnArguments.forEach { c.addSubsystemFromArgument(it) }
+
+        val lastExpression = returnArgumentsInfo.lastExpression
+        val allReturnArguments =
+            if (lastExpression != null && returnArgumentsInfo.lastExpressionCoercedToUnit && c.addSubsystemFromArgument(lastExpression)) {
+                returnArguments + lastExpression
+            } else {
+                returnArguments
+            }
+
+        val subResolvedKtPrimitives = allReturnArguments.map {
+            resolveKtPrimitive(
+                c.getBuilder(), it, lambda.returnType.let(::substitute), diagnosticHolder, ReceiverInfo.notReceiver, convertedType = null
+            ).apply {
+                if (this is LambdaWithTypeVariableAsExpectedTypeAtom)
+                    isReturnArgumentOfAnotherLambda = true
+            }
+        }
+
+        if (!returnArgumentsInfo.returnArgumentsExist) {
             val unitType = lambda.returnType.builtIns.unitType
             val lambdaReturnType = lambda.returnType.let(::substitute)
-            c.getBuilder().addSubtypeConstraint(lambdaReturnType, unitType, LambdaArgumentConstraintPosition(lambda))
             c.getBuilder().addSubtypeConstraint(unitType, lambdaReturnType, LambdaArgumentConstraintPosition(lambda))
         }
 
-        lambda.setAnalyzedResults(returnArguments, subResolvedKtPrimitives)
+        lambda.setAnalyzedResults(returnArgumentsInfo, subResolvedKtPrimitives)
 
         if (inferenceSession != null) {
             val storageSnapshot = c.getBuilder().currentStorage()
 
-            val postponedVariables = inferenceSession.inferPostponedVariables(lambda, storageSnapshot)
+            val postponedVariables = inferenceSession.inferPostponedVariables(lambda, storageSnapshot, diagnosticHolder)
+            if (postponedVariables == null) {
+                c.getBuilder().removePostponedVariables()
+                return
+            }
 
             for ((constructor, resultType) in postponedVariables) {
                 val variableWithConstraints = storageSnapshot.notFixedTypeVariables[constructor] ?: continue

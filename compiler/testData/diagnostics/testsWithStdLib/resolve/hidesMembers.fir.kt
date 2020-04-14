@@ -1,5 +1,6 @@
 // !CHECK_TYPE
 // !DIAGNOSTICS: -UNUSED_EXPRESSION -UNUSED_PARAMETER -UNUSED_VARIABLE
+// !WITH_NEW_INFERENCE
 
 // FILE: 2.kt
 package b
@@ -35,9 +36,9 @@ fun A.forEach() = ""
 fun A.forEach(s: String) {}
 
 fun test(a: A) {
-    a.forEach() checkType { <!UNRESOLVED_REFERENCE!>_<!><String>() }
+    a.forEach() checkType { _<String>() }
 
-    a.forEach(1) checkType { <!UNRESOLVED_REFERENCE!>_<!><Int>() }
+    a.forEach(1) checkType { _<Int>() }
 
     a.forEach("")
 

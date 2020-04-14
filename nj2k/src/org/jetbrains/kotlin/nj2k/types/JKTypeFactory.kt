@@ -94,8 +94,7 @@ class JKTypeFactory(val symbolProvider: JKSymbolProvider) {
             }
         }
         is PsiArrayType -> JKJavaArrayType(fromPsiType(type.componentType))
-        is PsiPrimitiveType -> JKJavaPrimitiveType.KEYWORD_TO_INSTANCE[type.presentableText]
-            ?: error("Invalid primitive type ${type.presentableText}")
+        is PsiPrimitiveType -> JKJavaPrimitiveType.fromPsi(type)
         is PsiDisjunctionType ->
             JKJavaDisjunctionType(type.disjunctions.map { fromPsiType(it) })
         is PsiWildcardType ->
@@ -132,7 +131,10 @@ class JKTypeFactory(val symbolProvider: JKSymbolProvider) {
 
             else -> JKClassType(
                 symbolProvider.provideClassSymbol(type.getJetTypeFqName(false)),//TODO constructor fqName
-                type.arguments.map { fromKotlinType(it.type) },
+                type.arguments.map { typeArgument ->
+                    if (typeArgument.isStarProjection) JKStarProjectionTypeImpl
+                    else fromKotlinType(typeArgument.type)
+                },
                 if (type.isNullable()) Nullability.Nullable else Nullability.NotNull
             )
         }

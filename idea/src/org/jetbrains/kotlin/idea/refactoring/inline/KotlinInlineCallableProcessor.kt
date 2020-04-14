@@ -25,6 +25,7 @@ import com.intellij.refactoring.util.CommonRefactoringUtil
 import com.intellij.usageView.UsageInfo
 import com.intellij.usageView.UsageViewBundle
 import com.intellij.usageView.UsageViewDescriptor
+import org.jetbrains.kotlin.idea.KotlinBundle
 import org.jetbrains.kotlin.idea.codeInliner.UsageReplacementStrategy
 import org.jetbrains.kotlin.idea.codeInliner.replaceUsages
 import org.jetbrains.kotlin.idea.findUsages.ReferencesSearchScopeHelper
@@ -40,16 +41,24 @@ class KotlinInlineCallableProcessor(
     private val reference: KtSimpleNameReference?,
     private val inlineThisOnly: Boolean,
     private val deleteAfter: Boolean,
-    private val statementToDelete: KtBinaryExpression? = null
+    private val statementToDelete: KtBinaryExpression? = null,
+    private val postAction: (KtCallableDeclaration) -> Unit = {}
 ) : BaseRefactoringProcessor(project) {
 
     private val kind = when (declaration) {
-        is KtNamedFunction -> "function"
-        is KtProperty -> if (declaration.isLocal) "local variable" else "property"
-        else -> "declaration"
+        is KtNamedFunction -> KotlinBundle.message("text.function")
+        is KtProperty -> if (declaration.isLocal)
+            KotlinBundle.message("text.local.variable")
+        else
+            KotlinBundle.message("text.local.property")
+        else -> KotlinBundle.message("text.declaration")
     }
 
-    private val commandName = "Inlining $kind ${DescriptiveNameUtil.getDescriptiveName(declaration)}"
+    private val commandName = KotlinBundle.message(
+        "text.inlining.0.1",
+        kind,
+        DescriptiveNameUtil.getDescriptiveName(declaration)
+    )
 
     override fun findUsages(): Array<UsageInfo> {
         if (inlineThisOnly && reference != null) return arrayOf(UsageInfo(reference))
@@ -76,12 +85,17 @@ class KotlinInlineCallableProcessor(
                         CommonRefactoringUtil.showErrorHint(
                             declaration.project,
                             null,
-                            "Cannot inline ${usages.size - simpleNameUsages.size}/${usages.size} usages",
-                            "Inline $kind",
+                            KotlinBundle.message(
+                                "text.cannot.inline.0.1.usages",
+                                usages.size - simpleNameUsages.size,
+                                usages.size
+                            ),
+                            KotlinBundle.message("text.inline.0", kind),
                             null
                         )
                     }
                 }
+                postAction(declaration)
             }
         )
     }
@@ -98,7 +112,7 @@ class KotlinInlineCallableProcessor(
 
             override fun getElements() = arrayOf(declaration)
 
-            override fun getProcessedElementsHeader() = "${kind.capitalize()} to inline"
+            override fun getProcessedElementsHeader() = KotlinBundle.message("text.0.to.inline", kind.capitalize())
         }
     }
 }

@@ -69,6 +69,11 @@ public class BytecodeListingTestGenerated extends AbstractBytecodeListingTest {
         runTest("compiler/testData/codegen/bytecodeListing/jvmOverloadsAndParametersAnnotations.kt");
     }
 
+    @TestMetadata("jvmStaticWithDefaultParameters.kt")
+    public void testJvmStaticWithDefaultParameters() throws Exception {
+        runTest("compiler/testData/codegen/bytecodeListing/jvmStaticWithDefaultParameters.kt");
+    }
+
     @TestMetadata("noCollectionStubMethodsInInterface.kt")
     public void testNoCollectionStubMethodsInInterface() throws Exception {
         runTest("compiler/testData/codegen/bytecodeListing/noCollectionStubMethodsInInterface.kt");
@@ -92,6 +97,16 @@ public class BytecodeListingTestGenerated extends AbstractBytecodeListingTest {
     @TestMetadata("noToArrayInJava.kt")
     public void testNoToArrayInJava() throws Exception {
         runTest("compiler/testData/codegen/bytecodeListing/noToArrayInJava.kt");
+    }
+
+    @TestMetadata("platformTypes.kt")
+    public void testPlatformTypes() throws Exception {
+        runTest("compiler/testData/codegen/bytecodeListing/platformTypes.kt");
+    }
+
+    @TestMetadata("privateDefaultImpls.kt")
+    public void testPrivateDefaultImpls() throws Exception {
+        runTest("compiler/testData/codegen/bytecodeListing/privateDefaultImpls.kt");
     }
 
     @TestMetadata("privateDefaultSetter.kt")

@@ -1,4 +1,4 @@
-// IGNORE_BACKEND_MULTI_MODULE: JVM_IR
+
 // FILE: 1.kt
 // SKIP_INLINE_CHECK_IN: lParams$default
 
@@ -53,7 +53,6 @@ Kotlin
 test/_1Kt
 *L
 1#1,39:1
-35#1,2:40
 *E
 
 SMAP

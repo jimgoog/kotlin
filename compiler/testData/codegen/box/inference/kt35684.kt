@@ -1,6 +1,5 @@
 // !LANGUAGE: +NewInference
-// !USE_EXPERIMENTAL: kotlin.Experimental
-// IGNORE_BACKEND_FIR: JVM_IR
+// !USE_EXPERIMENTAL: kotlin.RequiresOptIn
 // WITH_RUNTIME
 
 // ISSUE: KT-35684
@@ -14,7 +13,7 @@ fun test() {
     }
 }
 
-@UseExperimental(ExperimentalTypeInference::class)
+@OptIn(ExperimentalTypeInference::class)
 fun <U> sequence(@BuilderInference block: suspend Inv<U>.() -> Unit) {}
 
 interface Inv<T> {

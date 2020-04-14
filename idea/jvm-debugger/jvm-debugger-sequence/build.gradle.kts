@@ -6,8 +6,8 @@ plugins {
 dependencies {
     compile(project(":compiler:backend"))
     compile(project(":idea:ide-common"))
-    compile(toolsJar())
 
+    compileOnly(toolsJarApi())
     compileOnly(intellijDep())
     Platform[192].orHigher {
         compileOnly(intellijPluginDep("java"))
@@ -23,6 +23,3 @@ sourceSets {
     "main" { projectDefault() }
     "test" { none() }
 }
-
-val compileKotlin: org.jetbrains.kotlin.gradle.tasks.KotlinCompile by tasks
-compileKotlin.kotlinOptions.freeCompilerArgs += "-Xno-use-ir"

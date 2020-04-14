@@ -14,9 +14,9 @@ import com.intellij.openapi.roots.impl.ModuleOrderEntryImpl
 import com.intellij.openapi.util.io.FileUtil
 import org.jetbrains.jps.model.module.JpsModuleSourceRootType
 import org.jetbrains.jps.util.JpsPathUtil
-import org.jetbrains.kotlin.config.ExternalSystemTestTask
+import org.jetbrains.kotlin.config.ExternalSystemTestRunTask
 import org.jetbrains.kotlin.idea.facet.KotlinFacet
-import org.jetbrains.kotlin.idea.facet.externalSystemTestTasks
+import org.jetbrains.kotlin.idea.facet.externalSystemTestRunTasks
 import org.jetbrains.kotlin.idea.project.isHMPPEnabled
 import org.jetbrains.kotlin.idea.project.languageVersionSettings
 import org.jetbrains.kotlin.idea.project.platform
@@ -90,7 +90,7 @@ class ModuleInfo(
     private val rootModel = module.rootManager
     private val expectedDependencyNames = HashSet<String>()
     private val expectedSourceRoots = HashSet<String>()
-    private val expectedExternalSystemTestTasks = ArrayList<ExternalSystemTestTask>()
+    private val expectedExternalSystemTestTasks = ArrayList<ExternalSystemTestRunTask>()
 
     private val sourceFolderByPath by lazy {
         rootModel.contentEntries.asSequence()
@@ -161,7 +161,7 @@ class ModuleInfo(
     }
 
     fun externalSystemTestTask(taskName: String, projectId: String, targetName: String) {
-        expectedExternalSystemTestTasks.add(ExternalSystemTestTask(taskName, projectId, targetName))
+        expectedExternalSystemTestTasks.add(ExternalSystemTestRunTask(taskName, projectId, targetName))
     }
 
     fun libraryDependency(libraryName: String, scope: DependencyScope) {
@@ -201,7 +201,15 @@ class ModuleInfo(
     }
 
     fun moduleDependency(moduleName: String, scope: DependencyScope, productionOnTest: Boolean? = null) {
-        val moduleEntry = rootModel.orderEntries.filterIsInstance<ModuleOrderEntry>().singleOrNull { it.moduleName == moduleName }
+        val moduleEntries = rootModel.orderEntries.filterIsInstance<ModuleOrderEntry>().filter { it.moduleName == moduleName }
+        if (moduleEntries.size > 1) {
+            projectInfo.messageCollector.report(
+                "Found multiple order entries for module $moduleName: ${rootModel.orderEntries.filterIsInstance<ModuleOrderEntry>()}"
+            )
+            return
+        }
+        val moduleEntry = moduleEntries.singleOrNull()
+
         if (moduleEntry == null) {
             val allModules = rootModel.orderEntries.filterIsInstance<ModuleOrderEntry>().map { it.moduleName }.joinToString(", ")
             projectInfo.messageCollector.report("Module '${module.name}': No module dependency found: '$moduleName'. All module names: $allModules")
@@ -279,9 +287,9 @@ class ModuleInfo(
             }
         }
 
-        if ((!module.externalSystemTestTasks().containsAll(expectedExternalSystemTestTasks)) || (projectInfo.exhaustiveTestsList && (module.externalSystemTestTasks() != expectedExternalSystemTestTasks))) {
+        if ((!module.externalSystemTestRunTasks().containsAll(expectedExternalSystemTestTasks)) || (projectInfo.exhaustiveTestsList && (module.externalSystemTestRunTasks() != expectedExternalSystemTestTasks))) {
             projectInfo.messageCollector.report(
-                "Module '${module.name}': Expected tests list $expectedExternalSystemTestTasks doesn't match the actual one: ${module.externalSystemTestTasks()}"
+                "Module '${module.name}': Expected tests list $expectedExternalSystemTestTasks doesn't match the actual one: ${module.externalSystemTestRunTasks()}"
             )
         }
 

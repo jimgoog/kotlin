@@ -5,7 +5,7 @@
 
 package org.jetbrains.kotlin.fir.resolve.dfa
 
-import org.jetbrains.kotlin.fir.resolve.calls.ConeInferenceContext
+import org.jetbrains.kotlin.fir.types.ConeInferenceContext
 import org.jetbrains.kotlin.fir.types.ConeKotlinType
 import org.jetbrains.kotlin.fir.types.commonSuperTypeOrNull
 
@@ -14,6 +14,13 @@ abstract class Flow {
     abstract fun getImplications(variable: DataFlowVariable): Collection<Implication>
     abstract fun getVariablesInTypeStatements(): Collection<RealVariable>
     abstract fun removeOperations(variable: DataFlowVariable): Collection<Implication>
+
+    abstract val directAliasMap: Map<RealVariable, RealVariable>
+    abstract val backwardsAliasMap: Map<RealVariable, List<RealVariable>>
+}
+
+fun Flow.unwrapVariable(variable: RealVariable): RealVariable {
+    return directAliasMap[variable] ?: variable
 }
 
 abstract class LogicSystem<FLOW : Flow>(protected val context: ConeInferenceContext) {
@@ -22,6 +29,7 @@ abstract class LogicSystem<FLOW : Flow>(protected val context: ConeInferenceCont
     abstract fun createEmptyFlow(): FLOW
     abstract fun forkFlow(flow: FLOW): FLOW
     abstract fun joinFlow(flows: Collection<FLOW>): FLOW
+    abstract fun unionFlow(flows: Collection<FLOW>): FLOW
 
     abstract fun addTypeStatement(flow: FLOW, statement: TypeStatement)
 
@@ -44,6 +52,9 @@ abstract class LogicSystem<FLOW : Flow>(protected val context: ConeInferenceCont
         shouldForkFlow: Boolean,
         shouldRemoveSynthetics: Boolean,
     ): FLOW
+
+    abstract fun addLocalVariableAlias(flow: FLOW, alias: RealVariable, underlyingVariable: RealVariable)
+    abstract fun removeLocalVariableAlias(flow: FLOW, alias: RealVariable)
 
     protected abstract fun getImplicationsWithVariable(flow: FLOW, variable: DataFlowVariable): Collection<Implication>
 
@@ -126,9 +137,25 @@ abstract class LogicSystem<FLOW : Flow>(protected val context: ConeInferenceCont
         val allTypes = types.flatMapTo(mutableSetOf()) { it }
         val commonTypes = allTypes.toMutableSet()
         types.forEach { commonTypes.retainAll(it) }
-        val differentTypes = allTypes - commonTypes
-        context.commonSuperTypeOrNull(differentTypes.toList())?.let { commonTypes += it }
+        val differentTypes = types.mapNotNull { (it - commonTypes).takeIf { it.isNotEmpty() } }
+        if (differentTypes.size == types.size) {
+            context.commonSuperTypeOrNull(differentTypes.flatten())?.let { commonTypes += it }
+        }
         return commonTypes
+    }
+
+    protected fun and(statements: Collection<TypeStatement>): MutableTypeStatement {
+        require(statements.isNotEmpty())
+        statements.singleOrNull()?.let { return it as MutableTypeStatement }
+        val variable = statements.first().variable
+        assert(statements.all { it.variable == variable })
+        val exactType = andForTypes(statements.map { it.exactType })
+        val exactNotType = andForTypes(statements.map { it.exactNotType })
+        return MutableTypeStatement(variable, exactType, exactNotType)
+    }
+
+    private fun andForTypes(types: Collection<Set<ConeKotlinType>>): MutableSet<ConeKotlinType> {
+        return types.flatMapTo(mutableSetOf()) { it }
     }
 }
 

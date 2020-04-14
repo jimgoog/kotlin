@@ -35,7 +35,7 @@ typealias Psi2IrPostprocessingStep = (IrModuleFragment) -> Unit
 class Psi2IrTranslator(
     val languageVersionSettings: LanguageVersionSettings,
     val configuration: Psi2IrConfiguration = Psi2IrConfiguration(),
-    val mangler: KotlinMangler? = null
+    val signaturer: IdSignatureComposer
 ) {
     private val postprocessingSteps = SmartList<Psi2IrPostprocessingStep>()
 
@@ -43,6 +43,7 @@ class Psi2IrTranslator(
         postprocessingSteps.add(step)
     }
 
+    // NOTE: used only for test purpose
     fun generateModule(
         moduleDescriptor: ModuleDescriptor,
         ktFiles: Collection<KtFile>,
@@ -59,28 +60,32 @@ class Psi2IrTranslator(
     fun createGeneratorContext(
         moduleDescriptor: ModuleDescriptor,
         bindingContext: BindingContext,
-        symbolTable: SymbolTable = SymbolTable(mangler),
+        symbolTable: SymbolTable = SymbolTable(signaturer),
         extensions: GeneratorExtensions = GeneratorExtensions()
     ): GeneratorContext =
-        GeneratorContext(configuration, moduleDescriptor, bindingContext, languageVersionSettings, symbolTable, extensions)
+        createGeneratorContext(configuration, moduleDescriptor, bindingContext, languageVersionSettings, symbolTable, extensions, signaturer)
 
     fun generateModuleFragment(
         context: GeneratorContext,
         ktFiles: Collection<KtFile>,
         irProviders: List<IrProvider>,
-        expectDescriptorToSymbol: MutableMap<DeclarationDescriptor, IrSymbol>? = null
+        expectDescriptorToSymbol: MutableMap<DeclarationDescriptor, IrSymbol>? = null,
+        pluginExtensions: Collection<IrExtensionGenerator> = emptyList()
     ): IrModuleFragment {
         val moduleGenerator = ModuleGenerator(context)
         val irModule = moduleGenerator.generateModuleFragmentWithoutDependencies(ktFiles)
 
-        expectDescriptorToSymbol ?. let { referenceExpectsForUsedActuals(it, context.symbolTable, irModule) }
         irModule.patchDeclarationParents()
+        expectDescriptorToSymbol?.let { referenceExpectsForUsedActuals(it, context.symbolTable, irModule) }
         postprocess(context, irModule)
-        // do not generate unbound symbols before postprocessing,
-        // since plugins must work with non-lazy IR
-        moduleGenerator.generateUnboundSymbolsAsDependencies(irProviders)
-        irModule.computeUniqIdForDeclarations(context.symbolTable)
 
+        irProviders.filterIsInstance<IrDeserializer>().forEach { it.init(irModule, pluginExtensions) }
+
+        moduleGenerator.generateUnboundSymbolsAsDependencies(irProviders)
+
+        postprocessingSteps.forEach { it.invoke(irModule) }
+
+        // TODO: remove it once plugin API improved
         moduleGenerator.generateUnboundSymbolsAsDependencies(irProviders)
 
         return irModule
@@ -89,8 +94,6 @@ class Psi2IrTranslator(
     private fun postprocess(context: GeneratorContext, irElement: IrModuleFragment) {
         insertImplicitCasts(irElement, context)
         generateAnnotationsForDeclarations(context, irElement)
-
-        postprocessingSteps.forEach { it(irElement) }
 
         irElement.patchDeclarationParents()
     }

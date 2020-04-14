@@ -5,17 +5,17 @@
 
 package org.jetbrains.kotlin.idea.debugger.coroutine
 
-import com.intellij.ui.components.JBLabel
 import com.intellij.ui.SimpleListCellRenderer
+import com.intellij.ui.components.JBLabel
 import javax.swing.ListCellRenderer
 
-class VersionedImplementationProvider() {
+class VersionedImplementationProvider {
     fun comboboxListCellRenderer(): ListCellRenderer<in String>? =
-        SimpleListCellRenderer.create<String> { label: JBLabel, value: String?, index: Int ->
+        SimpleListCellRenderer.create { label: JBLabel, value: String?, index: Int ->
             if (value != null) {
                 label.text = value
             } else if (index >= 0) {
-                label.text = "Loading..."
+                label.text = KotlinDebuggerCoroutinesBundle.message("coroutine.dump.threads.loading")
             }
         }
 }

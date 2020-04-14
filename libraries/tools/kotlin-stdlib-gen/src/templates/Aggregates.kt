@@ -5,6 +5,7 @@
 
 package templates
 
+import templates.DocExtensions.mapResult
 import templates.Family.*
 import templates.SequenceClass.*
 
@@ -707,6 +708,85 @@ object Aggregates : TemplateGroupBase() {
         }
     }
 
+    val f_reduceIndexedOrNull = fn("reduceIndexedOrNull(operation: (index: Int, acc: T, T) -> T)") {
+        include(ArraysOfPrimitives, ArraysOfUnsigned, CharSequences)
+    } builder {
+        since("1.4")
+        inline()
+        specialFor(ArraysOfUnsigned) { inlineOnly() }
+
+        doc {
+            """
+            Accumulates value starting with the first ${f.element} and applying [operation] from left to right
+            to current accumulator value and each ${f.element} with its index in the original ${f.collection}.
+            Returns null if the ${f.collection} is empty.
+            @param [operation] function that takes the index of ${f.element.prefixWithArticle()}, current accumulator value
+            and the ${f.element} itself and calculates the next accumulator value.
+            """
+        }
+        sample("samples.collections.Collections.Aggregates.reduceOrNull")
+        returns("T?")
+        body {
+            """
+            if (isEmpty())
+                return null
+
+            var accumulator = this[0]
+            for (index in 1..lastIndex) {
+                accumulator = operation(index, accumulator, this[index])
+            }
+            return accumulator
+            """
+        }
+    }
+
+    val f_reduceIndexedOrNullSuper = fn("reduceIndexedOrNull(operation: (index: Int, acc: S, T) -> S)") {
+        include(ArraysOfObjects, Iterables, Sequences)
+    } builder {
+        since("1.4")
+        inline()
+
+        doc {
+            """
+            Accumulates value starting with the first ${f.element} and applying [operation] from left to right
+            to current accumulator value and each ${f.element} with its index in the original ${f.collection}.
+            Returns null if the ${f.collection} is empty.
+            @param [operation] function that takes the index of ${f.element.prefixWithArticle()}, current accumulator value
+            and the ${f.element} itself and calculates the next accumulator value.
+            """
+        }
+        typeParam("S")
+        typeParam("T : S")
+        sample("samples.collections.Collections.Aggregates.reduceOrNull")
+        returns("S?")
+        body {
+            fun checkOverflow(value: String) = if (f == Sequences || f == Iterables) "checkIndexOverflow($value)" else value
+            """
+            val iterator = this.iterator()
+            if (!iterator.hasNext()) return null
+
+            var index = 1
+            var accumulator: S = iterator.next()
+            while (iterator.hasNext()) {
+                accumulator = operation(${checkOverflow("index++")}, accumulator, iterator.next())
+            }
+            return accumulator
+            """
+        }
+        body(ArraysOfObjects) {
+            """
+            if (isEmpty())
+                return null
+
+            var accumulator: S = this[0]
+            for (index in 1..lastIndex) {
+                accumulator = operation(index, accumulator, this[index])
+            }
+            return accumulator
+            """
+        }
+    }
+
     val f_reduceRightIndexed = fn("reduceRightIndexed(operation: (index: Int, T, acc: T) -> T)") {
         include(CharSequences, ArraysOfPrimitives, ArraysOfUnsigned)
     } builder {
@@ -775,6 +855,90 @@ object Aggregates : TemplateGroupBase() {
             val iterator = listIterator(size)
             if (!iterator.hasPrevious())
                 throw UnsupportedOperationException("Empty list can't be reduced.")
+
+            var accumulator: S = iterator.previous()
+            while (iterator.hasPrevious()) {
+                val index = iterator.previousIndex()
+                accumulator = operation(index, iterator.previous(), accumulator)
+            }
+
+            return accumulator
+            """
+        }
+    }
+
+    val f_reduceRightIndexedOrNull = fn("reduceRightIndexedOrNull(operation: (index: Int, T, acc: T) -> T)") {
+        include(CharSequences, ArraysOfPrimitives, ArraysOfUnsigned)
+    } builder {
+        since("1.4")
+        inline()
+        specialFor(ArraysOfUnsigned) { inlineOnly() }
+
+        doc {
+            """
+            Accumulates value starting with last ${f.element} and applying [operation] from right to left
+            to each ${f.element} with its index in the original ${f.collection} and current accumulator value.
+            Returns null if the ${f.collection} is empty.
+            @param [operation] function that takes the index of ${f.element.prefixWithArticle()}, the ${f.element} itself
+            and current accumulator value, and calculates the next accumulator value.
+            """
+        }
+        sample("samples.collections.Collections.Aggregates.reduceRightOrNull")
+        returns("T?")
+        body {
+            """
+            var index = lastIndex
+            if (index < 0) return null
+
+            var accumulator = get(index--)
+            while (index >= 0) {
+                accumulator = operation(index, get(index), accumulator)
+                --index
+            }
+
+            return accumulator
+            """
+        }
+    }
+
+    val f_reduceRightIndexedOrNullSuper = fn("reduceRightIndexedOrNull(operation: (index: Int, T, acc: S) -> S)") {
+        include(Lists, ArraysOfObjects)
+    } builder {
+        since("1.4")
+        inline()
+
+        doc {
+            """
+            Accumulates value starting with last ${f.element} and applying [operation] from right to left
+            to each ${f.element} with its index in the original ${f.collection} and current accumulator value.
+            Returns null if the ${f.collection} is empty.
+            @param [operation] function that takes the index of ${f.element.prefixWithArticle()}, the ${f.element} itself
+            and current accumulator value, and calculates the next accumulator value.
+            """
+        }
+        sample("samples.collections.Collections.Aggregates.reduceRightOrNull")
+        typeParam("S")
+        typeParam("T : S")
+        returns("S?")
+        body {
+            """
+            var index = lastIndex
+            if (index < 0) return null
+
+            var accumulator: S = get(index--)
+            while (index >= 0) {
+                accumulator = operation(index, get(index), accumulator)
+                --index
+            }
+
+            return accumulator
+            """
+        }
+        body(Lists) {
+            """
+            val iterator = listIterator(size)
+            if (!iterator.hasPrevious())
+                return null
 
             var accumulator: S = iterator.previous()
             while (iterator.hasPrevious()) {
@@ -1037,14 +1201,387 @@ object Aggregates : TemplateGroupBase() {
         }
     }
 
+    private fun scanAccMutationNote(hasInitial: Boolean, f: Family): String {
+        if (!hasInitial && f.isPrimitiveSpecialization) return ""
+
+        val initialValueRequirement = if (hasInitial && f == Sequences)
+            """The [initial] value should also be immutable (or should not be mutated)
+            as it may be passed to [operation] function later because of sequence's lazy nature.
+            """ else
+            ""
+        return """
+        Note that `acc` value passed to [operation] function should not be mutated;
+        otherwise it would affect the previous value in resulting ${f.mapResult}.
+        $initialValueRequirement"""
+    }
+
+    val f_scan = fn("scan(initial: R, operation: (acc: R, T) -> R)") {
+        includeDefault()
+        include(CharSequences, ArraysOfUnsigned)
+    } builder {
+        since("1.3")
+        annotation("@ExperimentalStdlibApi")
+
+        specialFor(Iterables, ArraysOfObjects, CharSequences) { inline() }
+        specialFor(ArraysOfPrimitives, ArraysOfUnsigned) { inlineOnly() }
+
+        typeParam("R")
+
+        returns("List<R>")
+        specialFor(Sequences) { returns("Sequence<R>") }
+
+        doc {
+            """
+            Returns a ${f.mapResult} containing successive accumulation values generated by applying [operation] from left to right 
+            to each ${f.element} and current accumulator value that starts with [initial] value.
+            ${scanAccMutationNote(true, f)}
+            @param [operation] function that takes current accumulator value and ${f.element.prefixWithArticle()}, and calculates the next accumulator value.
+            """
+        }
+        sample("samples.collections.Collections.Aggregates.scan")
+        sequenceClassification(intermediate, stateless)
+
+        body(ArraysOfObjects, ArraysOfPrimitives, ArraysOfUnsigned, CharSequences) {
+            """
+            if (isEmpty()) return listOf(initial)
+
+            val result = ArrayList<R>(${f.code.size} + 1).apply { add(initial) }
+            var accumulator = initial
+            for (element in this) {
+                accumulator = operation(accumulator, element)
+                result.add(accumulator)
+            }
+            return result
+            """
+        }
+        body(Iterables) {
+            """
+            val estimatedSize = collectionSizeOrDefault(9)
+            if (estimatedSize == 0) return listOf(initial)
+            
+            val result = ArrayList<R>(estimatedSize + 1).apply { add(initial) }
+            var accumulator = initial
+            for (element in this) {
+                accumulator = operation(accumulator, element)
+                result.add(accumulator)
+            }
+            return result
+            """
+        }
+        body(Sequences) {
+            """
+            return sequence {
+                yield(initial)
+                var accumulator = initial
+                for (element in this@scan) {
+                    accumulator = operation(accumulator, element)
+                    yield(accumulator)
+                }
+            }
+            """
+        }
+    }
+
+    val f_scanIndexed = fn("scanIndexed(initial: R, operation: (index: Int, acc: R, T) -> R)") {
+        includeDefault()
+        include(CharSequences, ArraysOfUnsigned)
+    } builder {
+        since("1.3")
+        annotation("@ExperimentalStdlibApi")
+
+        specialFor(Iterables, ArraysOfObjects, CharSequences) { inline() }
+        specialFor(ArraysOfPrimitives, ArraysOfUnsigned) { inlineOnly() }
+
+        typeParam("R")
+
+        returns("List<R>")
+        specialFor(Sequences) { returns("Sequence<R>") }
+
+        doc {
+            """
+            Returns a ${f.mapResult} containing successive accumulation values generated by applying [operation] from left to right
+            to each ${f.element}, its index in the original ${f.collection} and current accumulator value that starts with [initial] value.
+            ${scanAccMutationNote(true, f)}
+            @param [operation] function that takes the index of ${f.element.prefixWithArticle()}, current accumulator value
+            and the ${f.element} itself, and calculates the next accumulator value.
+            """
+        }
+        sample("samples.collections.Collections.Aggregates.scan")
+        sequenceClassification(intermediate, stateless)
+
+        body(ArraysOfObjects, ArraysOfPrimitives, ArraysOfUnsigned, CharSequences) {
+            """
+            if (isEmpty()) return listOf(initial)
+
+            val result = ArrayList<R>(${f.code.size} + 1).apply { add(initial) }
+            var accumulator = initial
+            for (index in indices) {
+                accumulator = operation(index, accumulator, this[index])
+                result.add(accumulator)
+            }
+            return result
+            """
+        }
+        body(Iterables) {
+            """
+            val estimatedSize = collectionSizeOrDefault(9)
+            if (estimatedSize == 0) return listOf(initial)
+            
+            val result = ArrayList<R>(estimatedSize + 1).apply { add(initial) }
+            var index = 0
+            var accumulator = initial
+            for (element in this) {
+                accumulator = operation(index++, accumulator, element)
+                result.add(accumulator)
+            }
+            return result
+            """
+        }
+        body(Sequences) {
+            """
+            return sequence {
+                yield(initial)
+                var index = 0
+                var accumulator = initial
+                for (element in this@scanIndexed) {
+                    accumulator = operation(checkIndexOverflow(index++), accumulator, element)
+                    yield(accumulator)
+                }
+            }
+            """
+        }
+    }
+
+    val f_scanReduce = fn("scanReduce(operation: (acc: T, T) -> T)") {
+        include(ArraysOfPrimitives, ArraysOfUnsigned, CharSequences)
+    } builder {
+        since("1.3")
+        annotation("@ExperimentalStdlibApi")
+
+        specialFor(CharSequences) { inline() }
+        specialFor(ArraysOfPrimitives, ArraysOfUnsigned) { inlineOnly() }
+
+        returns("List<T>")
+
+        doc {
+            """
+            Returns a list containing successive accumulation values generated by applying [operation] from left to right 
+            to each ${f.element} and current accumulator value that starts with the first ${f.element} of this ${f.collection}.
+            ${scanAccMutationNote(false, f)}
+            @param [operation] function that takes current accumulator value and ${f.element.prefixWithArticle()}, and calculates the next accumulator value.
+            """
+        }
+        sample("samples.collections.Collections.Aggregates.scanReduce")
+
+        body {
+            """
+            if (isEmpty()) return emptyList()
+            
+            var accumulator = this[0]
+            val result = ArrayList<T>(${f.code.size}).apply { add(accumulator) }
+            for (index in 1 until ${f.code.size}) {
+                accumulator = operation(accumulator, this[index])
+                result.add(accumulator)
+            }
+            return result
+            """
+        }
+    }
+
+    val f_scanReduceIndexed = fn("scanReduceIndexed(operation: (index: Int, acc: T, T) -> T)") {
+        include(ArraysOfPrimitives, ArraysOfUnsigned, CharSequences)
+    } builder {
+        since("1.3")
+        annotation("@ExperimentalStdlibApi")
+
+        specialFor(CharSequences) { inline() }
+        specialFor(ArraysOfPrimitives, ArraysOfUnsigned) { inlineOnly() }
+
+        returns("List<T>")
+
+        doc {
+            """
+            Returns a list containing successive accumulation values generated by applying [operation] from left to right 
+            to each ${f.element}, its index in the original ${f.collection} and current accumulator value that starts with the first ${f.element} of this ${f.collection}.
+            ${scanAccMutationNote(false, f)}
+            @param [operation] function that takes the index of ${f.element.prefixWithArticle()}, current accumulator value
+            and the ${f.element} itself, and calculates the next accumulator value.
+            """
+        }
+        sample("samples.collections.Collections.Aggregates.scanReduce")
+
+        body {
+            """
+            if (isEmpty()) return emptyList()
+
+            var accumulator = this[0]
+            val result = ArrayList<T>(${f.code.size}).apply { add(accumulator) }
+            for (index in 1 until ${f.code.size}) {
+                accumulator = operation(index, accumulator, this[index])
+                result.add(accumulator)
+            }
+            return result
+            """
+        }
+    }
+
+    val f_scanReduceSuper = fn("scanReduce(operation: (acc: S, T) -> S)") {
+        include(ArraysOfObjects, Iterables, Sequences)
+    } builder {
+        since("1.3")
+        annotation("@ExperimentalStdlibApi")
+
+        specialFor(ArraysOfObjects, Iterables) { inline() }
+
+        typeParam("S")
+        typeParam("T : S")
+
+        returns("List<S>")
+        specialFor(Sequences) { returns("Sequence<S>") }
+
+        doc {
+            """
+            Returns a ${f.mapResult} containing successive accumulation values generated by applying [operation] from left to right 
+            to each ${f.element} and current accumulator value that starts with the first ${f.element} of this ${f.collection}.
+            ${scanAccMutationNote(false, f)}
+            @param [operation] function that takes current accumulator value and the ${f.element}, and calculates the next accumulator value.
+            """
+        }
+        sample("samples.collections.Collections.Aggregates.scanReduce")
+        sequenceClassification(intermediate, stateless)
+
+        body(ArraysOfObjects) {
+            """
+            if (isEmpty()) return emptyList()
+
+            var accumulator: S = this[0]
+            val result = ArrayList<S>(size).apply { add(accumulator) }
+            for (index in 1 until size) {
+                accumulator = operation(accumulator, this[index])
+                result.add(accumulator)
+            }
+            return result
+            """
+        }
+        body(Iterables) {
+            """
+            val iterator = this.iterator()
+            if (!iterator.hasNext()) return emptyList()
+
+            var accumulator: S = iterator.next()
+            val result = ArrayList<S>(collectionSizeOrDefault(10)).apply { add(accumulator) }
+            while (iterator.hasNext()) {
+                accumulator = operation(accumulator, iterator.next())
+                result.add(accumulator)
+            }
+            return result
+            """
+        }
+        body(Sequences) {
+            """
+            return sequence {
+                val iterator = iterator()
+                if (iterator.hasNext()) {
+                    var accumulator: S = iterator.next()
+                    yield(accumulator)
+                    while (iterator.hasNext()) {
+                        accumulator = operation(accumulator, iterator.next())
+                        yield(accumulator)
+                    }
+                }
+            }
+            """
+        }
+    }
+
+    val f_scanReduceIndexedSuper = fn("scanReduceIndexed(operation: (index: Int, acc: S, T) -> S)") {
+        include(ArraysOfObjects, Iterables, Sequences)
+    } builder {
+        since("1.3")
+        annotation("@ExperimentalStdlibApi")
+
+        specialFor(ArraysOfObjects, Iterables) { inline() }
+
+        typeParam("S")
+        typeParam("T : S")
+
+        returns("List<S>")
+        specialFor(Sequences) { returns("Sequence<S>") }
+
+        doc {
+            """
+            Returns a ${f.mapResult} containing successive accumulation values generated by applying [operation] from left to right 
+            to each ${f.element}, its index in the original ${f.collection} and current accumulator value that starts with the first ${f.element} of this ${f.collection}.
+            ${scanAccMutationNote(false, f)}
+            @param [operation] function that takes the index of ${f.element.prefixWithArticle()}, current accumulator value
+            and the ${f.element} itself, and calculates the next accumulator value.
+            """
+        }
+        sample("samples.collections.Collections.Aggregates.scanReduce")
+        sequenceClassification(intermediate, stateless)
+
+        body(ArraysOfObjects) {
+            """
+            if (isEmpty()) return emptyList()
+
+            var accumulator: S = this[0]
+            val result = ArrayList<S>(size).apply { add(accumulator) }
+            for (index in 1 until size) {
+                accumulator = operation(index, accumulator, this[index])
+                result.add(accumulator)
+            }
+            return result
+            """
+        }
+        body(Iterables) {
+            """
+            val iterator = this.iterator()
+            if (!iterator.hasNext()) return emptyList()
+
+            var accumulator: S = iterator.next()
+            val result = ArrayList<S>(collectionSizeOrDefault(10)).apply { add(accumulator) }
+            var index = 1
+            while (iterator.hasNext()) {
+                accumulator = operation(index++, accumulator, iterator.next())
+                result.add(accumulator)
+            }
+            return result
+            """
+        }
+        body(Sequences) {
+            """
+            return sequence {
+                val iterator = iterator()
+                if (iterator.hasNext()) {
+                    var accumulator: S = iterator.next()
+                    yield(accumulator)
+                    var index = 1
+                    while (iterator.hasNext()) {
+                        accumulator = operation(checkIndexOverflow(index++), accumulator, iterator.next())
+                        yield(accumulator)
+                    }
+                }
+            }
+            """
+        }
+    }
+
     val f_onEach = fn("onEach(action: (T) -> Unit)") {
-        include(Iterables, Maps, CharSequences, Sequences)
+        includeDefault()
+        include(Maps, CharSequences, ArraysOfUnsigned)
     } builder {
         since("1.1")
+        doc { "Performs the given [action] on each ${f.element} and returns the ${f.collection} itself afterwards." }
+
+        specialFor(ArraysOfObjects, ArraysOfPrimitives, ArraysOfUnsigned) {
+            since("1.4")
+            inlineOnly()
+            returns("SELF")
+            body { "return apply { for (element in this) action(element) }" }
+        }
 
         specialFor(Iterables, Maps, CharSequences) {
             inline()
-            doc { "Performs the given [action] on each ${f.element} and returns the ${f.collection} itself afterwards." }
             val collectionType = when (f) {
                 Maps -> "M"
                 CharSequences -> "S"
@@ -1066,6 +1603,61 @@ object Aggregates : TemplateGroupBase() {
                 return map {
                     action(it)
                     it
+                }
+                """
+            }
+        }
+    }
+
+    val f_onEachIndexed = fn("onEachIndexed(action: (index: Int, T) -> Unit)") {
+        includeDefault()
+        include(Maps, CharSequences, ArraysOfUnsigned)
+    } builder {
+        since("1.4")
+
+        doc {
+            """
+                Performs the given [action] on each ${f.element}, providing sequential index with the ${f.element}, 
+                and returns the ${f.collection} itself afterwards.
+                @param [action] function that takes the index of ${f.element.prefixWithArticle()} and the ${f.element} itself
+                and performs the action on the ${f.element}.
+                """
+        }
+
+        specialFor(ArraysOfObjects, ArraysOfPrimitives, ArraysOfUnsigned) {
+            inlineOnly()
+            returns("SELF")
+            body { "return apply { forEachIndexed(action) }" }
+        }
+
+        specialFor(Maps, Iterables, CharSequences) {
+            inline()
+            val collectionType = when (f) {
+                Maps -> "M"
+                CharSequences -> "S"
+                else -> "C"
+            }
+            receiver(collectionType)
+            returns(collectionType)
+            typeParam("$collectionType : SELF")
+            body { "return apply { ${if (f == Maps) "entries." else ""}forEachIndexed(action) }" }
+        }
+
+        specialFor(Sequences) {
+            returns("SELF")
+            doc {
+                """
+                Returns a sequence which performs the given [action] on each ${f.element} of the original sequence as they pass through it.
+                @param [action] function that takes the index of ${f.element.prefixWithArticle()} and the ${f.element} itself
+                and performs the action on the ${f.element}.
+                """
+            }
+            sequenceClassification(intermediate, stateless)
+            body {
+                """
+                return mapIndexed { index, element ->
+                    action(index, element)
+                    element
                 }
                 """
             }
@@ -1100,7 +1692,7 @@ object Aggregates : TemplateGroupBase() {
             """
             Performs the given [action] on each ${f.element}, providing sequential index with the ${f.element}.
             @param [action] function that takes the index of ${f.element.prefixWithArticle()} and the ${f.element} itself
-            and performs the desired action on the ${f.element}.
+            and performs the action on the ${f.element}.
             """ }
         returns("Unit")
         body {

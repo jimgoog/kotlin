@@ -1,21 +1,24 @@
 plugins {
-    kotlin("multiplatform") version "1.3.61"
+    kotlin("multiplatform") version "KOTLIN_VERSION"
 }
 group = "testGroupId"
 version = "1.0-SNAPSHOT"
 
 repositories {
     mavenCentral()
+    maven {
+        url = uri("https://dl.bintray.com/kotlin/kotlin-dev")
+    }
 }
 kotlin {
     js("nodeJs") {
         nodejs {
-
+            binaries.executable()
         }
     }
     js("browser") {
         browser {
-
+            binaries.executable()
         }
     }
     sourceSets {
@@ -30,6 +33,10 @@ kotlin {
                 implementation(kotlin("stdlib-js"))
             }
         }
-        val browserTest by getting
+        val browserTest by getting {
+            dependencies {
+                implementation(kotlin("test-js"))
+            }
+        }
     }
 }

@@ -1,4 +1,4 @@
-// IGNORE_BACKEND_MULTI_MODULE: JVM_IR
+
 // FILE: 1.kt
 
 package test
@@ -25,7 +25,6 @@ Kotlin
 test/_1Kt
 *L
 1#1,9:1
-6#1:10
 *E
 
 SMAP

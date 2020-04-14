@@ -5,19 +5,23 @@
 
 package org.jetbrains.kotlin.idea.codeInsight
 
-import com.intellij.codeInsight.CodeInsightBundle
 import com.intellij.codeInsight.CodeInsightSettings
 import com.intellij.codeInsight.hint.HintManager
 import com.intellij.codeInsight.hint.HintManagerImpl
 import com.intellij.codeInsight.hint.HintUtil
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ModalityState
+import com.intellij.openapi.application.ReadAction.nonBlocking
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.project.Project
 import com.intellij.ui.LightweightHint
 import com.intellij.util.ArrayUtil
+import com.intellij.util.concurrency.AppExecutorUtil
 import org.jetbrains.annotations.TestOnly
+import org.jetbrains.concurrency.CancellablePromise
+import org.jetbrains.kotlin.idea.KotlinBundle
 import org.jetbrains.kotlin.idea.imports.KotlinImportOptimizer
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.psi.KtFile
@@ -26,6 +30,7 @@ import java.util.*
 import javax.swing.event.HyperlinkEvent
 import javax.swing.event.HyperlinkListener
 
+// BUNCH 192
 object ReviewAddedImports {
     @get:TestOnly
     var importsToBeReviewed: Collection<String> = emptyList()
@@ -47,8 +52,7 @@ object ReviewAddedImports {
                 removeImports(project, file, importsToBeDeleted)
                 return
             }
-            val notificationText = CodeInsightBundle
-                .message("copy.paste.reference.notification", imported.size)
+            val notificationText = KotlinBundle.htmlMessage("copy.paste.reference.notification", imported.size)
             ApplicationManager.getApplication().invokeLater(
                 Runnable {
                     showHint(
@@ -82,7 +86,7 @@ object ReviewAddedImports {
         importedClasses: Set<String>
     ) {
         val dialog = RestoreReferencesDialog(project, ArrayUtil.toObjectArray(importedClasses))
-        dialog.title = CodeInsightBundle.message("dialog.import.on.paste.title3")
+        dialog.title = KotlinBundle.message("dialog.import.on.paste.title3")
         if (dialog.showAndGet()) {
             removeImports(project, file, dialog.selectedElements.map { it as String }.toSortedSet())
         }
@@ -95,7 +99,7 @@ object ReviewAddedImports {
     ) {
         if (importsToRemove.isEmpty()) return
 
-        WriteCommandAction.runWriteCommandAction(project, "revert applied imports", null, Runnable {
+        WriteCommandAction.runWriteCommandAction(project, KotlinBundle.message("revert.applied.imports"), null, Runnable {
             val newImports = file.importDirectives.mapNotNull {
                 val importedFqName = it.importedFqName ?: return@mapNotNull null
                 if (importsToRemove.contains(importedFqName.asString())) return@mapNotNull null
@@ -104,5 +108,13 @@ object ReviewAddedImports {
             KotlinImportOptimizer.replaceImports(file, newImports)
         })
     }
-
 }
+
+internal fun <T> submitNonBlocking(project: Project, indicator: ProgressIndicator, block: () -> T): CancellablePromise<T> =
+    nonBlocking<T> {
+        return@nonBlocking block()
+    }
+        .withDocumentsCommitted(project)
+        .cancelWith(indicator)
+        .expireWith(project)
+        .submit(AppExecutorUtil.getAppExecutorService())

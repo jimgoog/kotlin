@@ -34,9 +34,11 @@ import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.OverridingUtil
 import org.jetbrains.kotlin.resolve.calls.callUtil.getResolvedCall
 import org.jetbrains.kotlin.resolve.calls.callUtil.getValueArgumentsInParentheses
-import org.jetbrains.kotlin.resolve.calls.components.SamConversionTransformer
 import org.jetbrains.kotlin.resolve.calls.model.ArgumentMatch
 import org.jetbrains.kotlin.resolve.lazy.BodyResolveMode
+import org.jetbrains.kotlin.resolve.sam.SamConversionOracle
+import org.jetbrains.kotlin.resolve.sam.SamConversionResolver
+import org.jetbrains.kotlin.resolve.sam.getFunctionTypeForPossibleSamType
 import org.jetbrains.kotlin.types.KotlinType
 import org.jetbrains.kotlin.types.isError
 import org.jetbrains.kotlin.types.typeUtil.isTypeParameter
@@ -72,18 +74,20 @@ fun KtLambdaArgument.getLambdaArgumentName(bindingContext: BindingContext): Name
 
 fun KtLambdaArgument.moveInsideParenthesesAndReplaceWith(
     replacement: KtExpression,
-    functionLiteralArgumentName: Name?
+    functionLiteralArgumentName: Name?,
+    withNameCheck: Boolean = true,
 ): KtCallExpression {
     val oldCallExpression = parent as KtCallExpression
     val newCallExpression = oldCallExpression.copy() as KtCallExpression
 
     val psiFactory = KtPsiFactory(project)
 
-    val argument = if (shouldLambdaParameterBeNamed(newCallExpression.getValueArgumentsInParentheses(), oldCallExpression)) {
-        psiFactory.createArgument(replacement, functionLiteralArgumentName)
-    } else {
-        psiFactory.createArgument(replacement)
-    }
+    val argument =
+        if (withNameCheck && shouldLambdaParameterBeNamed(newCallExpression.getValueArgumentsInParentheses(), oldCallExpression)) {
+            psiFactory.createArgument(replacement, functionLiteralArgumentName)
+        } else {
+            psiFactory.createArgument(replacement)
+        }
 
     val functionLiteralArgument = newCallExpression.lambdaArguments.firstOrNull()!!
     val valueArgumentList = newCallExpression.valueArgumentList ?: psiFactory.createCallArguments("()")
@@ -127,7 +131,8 @@ fun KtCallExpression.canMoveLambdaOutsideParentheses(): Boolean {
         val referenceArgumentCount = valueArguments.count { it.getArgumentExpression() is KtCallableReferenceExpression }
 
         val resolutionFacade = getResolutionFacade()
-        val samConversionTransformer = resolutionFacade.frontendService<SamConversionTransformer>()
+        val samConversionTransformer = resolutionFacade.frontendService<SamConversionResolver>()
+        val samConversionOracle = resolutionFacade.frontendService<SamConversionOracle>()
         val languageVersionSettings = resolutionFacade.frontendService<LanguageVersionSettings>()
 
         val bindingContext = analyze(resolutionFacade, BodyResolveMode.PARTIAL)
@@ -142,6 +147,7 @@ fun KtCallExpression.canMoveLambdaOutsideParentheses(): Boolean {
             it.allowsMoveOfLastParameterOutsideParentheses(
                 lambdaArgumentCount + referenceArgumentCount,
                 samConversionTransformer,
+                samConversionOracle,
                 languageVersionSettings.supportsFeature(LanguageFeature.NewInference)
             )
         }
@@ -154,7 +160,8 @@ fun KtCallExpression.canMoveLambdaOutsideParentheses(): Boolean {
 
 private fun FunctionDescriptor.allowsMoveOfLastParameterOutsideParentheses(
     lambdaAndCallableReferencesInOriginalCallCount: Int,
-    samConversionTransformer: SamConversionTransformer,
+    samConversionTransformer: SamConversionResolver,
+    samConversionOracle: SamConversionOracle,
     newInferenceEnabled: Boolean
 ): Boolean {
     fun KotlinType.allowsMoveOutsideParentheses(): Boolean {
@@ -166,7 +173,7 @@ private fun FunctionDescriptor.allowsMoveOfLastParameterOutsideParentheses(
         // converted types, but in NI it is performed by conversions, so we check it explicitly
         // Also note that 'newInferenceEnabled' is essentially a micro-optimization, as there are no
         // harm in just calling 'samConversionTransformer' on all candidates.
-        return newInferenceEnabled && samConversionTransformer.getFunctionTypeForPossibleSamType(this.unwrap()) != null
+        return newInferenceEnabled && samConversionTransformer.getFunctionTypeForPossibleSamType(this.unwrap(), samConversionOracle) != null
     }
 
     val params = valueParameters

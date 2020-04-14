@@ -6,21 +6,19 @@
 package org.jetbrains.kotlin.fir.scopes
 
 import org.jetbrains.kotlin.fir.declarations.FirTypeParameter
+import org.jetbrains.kotlin.fir.resolve.substitution.ConeSubstitutor
 import org.jetbrains.kotlin.fir.symbols.impl.FirClassifierSymbol
 import org.jetbrains.kotlin.name.Name
 
 abstract class FirTypeParameterScope : FirScope() {
     abstract val typeParameters: Map<Name, List<FirTypeParameter>>
 
-    override fun processClassifiersByName(
+    override fun processClassifiersByNameWithSubstitution(
         name: Name,
-        processor: (FirClassifierSymbol<*>) -> ProcessorAction
-    ): ProcessorAction {
-        val matchedTypeParameters = typeParameters[name] ?: return ProcessorAction.NEXT
+        processor: (FirClassifierSymbol<*>, ConeSubstitutor) -> Unit
+    ) {
+        val matchedTypeParameters = typeParameters[name] ?: return
 
-        return when {
-            matchedTypeParameters.all { processor(it.symbol) == ProcessorAction.NEXT } -> ProcessorAction.NEXT
-            else -> ProcessorAction.STOP
-        }
+        matchedTypeParameters.forEach { processor(it.symbol, ConeSubstitutor.Empty) }
     }
 }

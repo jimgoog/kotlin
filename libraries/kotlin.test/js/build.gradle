@@ -19,7 +19,7 @@ dependencies {
 compileKotlin2Js {
     kotlinOptions.freeCompilerArgs = [
             "-Xallow-kotlin-package",
-            "-Xuse-experimental=kotlin.contracts.ExperimentalContracts",
+            "-Xopt-in=kotlin.contracts.ExperimentalContracts",
     ]
     kotlinOptions {
         moduleKind = "umd"
@@ -62,7 +62,7 @@ task libraryJarWithIr(type: Zip, dependsOn: libraryJarWithoutIr) {
     if (rootProject.includeStdlibJsIr) {
         def irKlib = tasks.getByPath(":kotlin-stdlib-js-ir:generateKotlinTestKLib")
         dependsOn(irKlib)
-        from fileTree("${irKlib.outputs.files.singleFile.path}/klib")
+        from fileTree(irKlib.outputs.files.singleFile.path)
     }
 }
 

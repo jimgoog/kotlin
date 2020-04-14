@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2020 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -132,25 +132,6 @@ public class Byte private constructor() : Number(), Comparable<Byte> {
     public operator fun div(other: Double): Double
 
     /** Calculates the remainder of dividing this value by the other value. */
-    @Deprecated("Use rem(other) instead", ReplaceWith("rem(other)"), DeprecationLevel.ERROR)
-    public operator fun mod(other: Byte): Int
-    /** Calculates the remainder of dividing this value by the other value. */
-    @Deprecated("Use rem(other) instead", ReplaceWith("rem(other)"), DeprecationLevel.ERROR)
-    public operator fun mod(other: Short): Int
-    /** Calculates the remainder of dividing this value by the other value. */
-    @Deprecated("Use rem(other) instead", ReplaceWith("rem(other)"), DeprecationLevel.ERROR)
-    public operator fun mod(other: Int): Int
-    /** Calculates the remainder of dividing this value by the other value. */
-    @Deprecated("Use rem(other) instead", ReplaceWith("rem(other)"), DeprecationLevel.ERROR)
-    public operator fun mod(other: Long): Long
-    /** Calculates the remainder of dividing this value by the other value. */
-    @Deprecated("Use rem(other) instead", ReplaceWith("rem(other)"), DeprecationLevel.ERROR)
-    public operator fun mod(other: Float): Float
-    /** Calculates the remainder of dividing this value by the other value. */
-    @Deprecated("Use rem(other) instead", ReplaceWith("rem(other)"), DeprecationLevel.ERROR)
-    public operator fun mod(other: Double): Double
-
-    /** Calculates the remainder of dividing this value by the other value. */
     @SinceKotlin("1.1")
     public operator fun rem(other: Byte): Int
     /** Calculates the remainder of dividing this value by the other value. */
@@ -237,6 +218,10 @@ public class Byte private constructor() : Number(), Comparable<Byte> {
      * The resulting `Double` value represents the same numerical value as this `Byte`.
      */
     public override fun toDouble(): Double
+
+    public override fun equals(other: Any?): Boolean
+    public override fun hashCode(): Int
+    public override fun toString(): String
 }
 
 /**
@@ -363,25 +348,6 @@ public class Short private constructor() : Number(), Comparable<Short> {
     public operator fun div(other: Double): Double
 
     /** Calculates the remainder of dividing this value by the other value. */
-    @Deprecated("Use rem(other) instead", ReplaceWith("rem(other)"), DeprecationLevel.ERROR)
-    public operator fun mod(other: Byte): Int
-    /** Calculates the remainder of dividing this value by the other value. */
-    @Deprecated("Use rem(other) instead", ReplaceWith("rem(other)"), DeprecationLevel.ERROR)
-    public operator fun mod(other: Short): Int
-    /** Calculates the remainder of dividing this value by the other value. */
-    @Deprecated("Use rem(other) instead", ReplaceWith("rem(other)"), DeprecationLevel.ERROR)
-    public operator fun mod(other: Int): Int
-    /** Calculates the remainder of dividing this value by the other value. */
-    @Deprecated("Use rem(other) instead", ReplaceWith("rem(other)"), DeprecationLevel.ERROR)
-    public operator fun mod(other: Long): Long
-    /** Calculates the remainder of dividing this value by the other value. */
-    @Deprecated("Use rem(other) instead", ReplaceWith("rem(other)"), DeprecationLevel.ERROR)
-    public operator fun mod(other: Float): Float
-    /** Calculates the remainder of dividing this value by the other value. */
-    @Deprecated("Use rem(other) instead", ReplaceWith("rem(other)"), DeprecationLevel.ERROR)
-    public operator fun mod(other: Double): Double
-
-    /** Calculates the remainder of dividing this value by the other value. */
     @SinceKotlin("1.1")
     public operator fun rem(other: Byte): Int
     /** Calculates the remainder of dividing this value by the other value. */
@@ -466,6 +432,10 @@ public class Short private constructor() : Number(), Comparable<Short> {
      * The resulting `Double` value represents the same numerical value as this `Short`.
      */
     public override fun toDouble(): Double
+
+    public override fun equals(other: Any?): Boolean
+    public override fun hashCode(): Int
+    public override fun toString(): String
 }
 
 /**
@@ -592,25 +562,6 @@ public class Int private constructor() : Number(), Comparable<Int> {
     public operator fun div(other: Double): Double
 
     /** Calculates the remainder of dividing this value by the other value. */
-    @Deprecated("Use rem(other) instead", ReplaceWith("rem(other)"), DeprecationLevel.ERROR)
-    public operator fun mod(other: Byte): Int
-    /** Calculates the remainder of dividing this value by the other value. */
-    @Deprecated("Use rem(other) instead", ReplaceWith("rem(other)"), DeprecationLevel.ERROR)
-    public operator fun mod(other: Short): Int
-    /** Calculates the remainder of dividing this value by the other value. */
-    @Deprecated("Use rem(other) instead", ReplaceWith("rem(other)"), DeprecationLevel.ERROR)
-    public operator fun mod(other: Int): Int
-    /** Calculates the remainder of dividing this value by the other value. */
-    @Deprecated("Use rem(other) instead", ReplaceWith("rem(other)"), DeprecationLevel.ERROR)
-    public operator fun mod(other: Long): Long
-    /** Calculates the remainder of dividing this value by the other value. */
-    @Deprecated("Use rem(other) instead", ReplaceWith("rem(other)"), DeprecationLevel.ERROR)
-    public operator fun mod(other: Float): Float
-    /** Calculates the remainder of dividing this value by the other value. */
-    @Deprecated("Use rem(other) instead", ReplaceWith("rem(other)"), DeprecationLevel.ERROR)
-    public operator fun mod(other: Double): Double
-
-    /** Calculates the remainder of dividing this value by the other value. */
     @SinceKotlin("1.1")
     public operator fun rem(other: Byte): Int
     /** Calculates the remainder of dividing this value by the other value. */
@@ -714,6 +665,10 @@ public class Int private constructor() : Number(), Comparable<Int> {
      * The resulting `Double` value represents the same numerical value as this `Int`.
      */
     public override fun toDouble(): Double
+
+    public override fun equals(other: Any?): Boolean
+    public override fun hashCode(): Int
+    public override fun toString(): String
 }
 
 /**
@@ -725,32 +680,39 @@ public class Float private constructor() : Number(), Comparable<Float> {
         /**
          * A constant holding the smallest *positive* nonzero value of Float.
          */
-        @Suppress("MUST_BE_INITIALIZED_OR_BE_ABSTRACT")
-        public val MIN_VALUE: Float
+        public const val MIN_VALUE: Float = 1.4E-45F
 
         /**
          * A constant holding the largest positive finite value of Float.
          */
-        @Suppress("MUST_BE_INITIALIZED_OR_BE_ABSTRACT")
-        public val MAX_VALUE: Float
+        public const val MAX_VALUE: Float = 3.4028235E38F
 
         /**
          * A constant holding the positive infinity value of Float.
          */
-        @Suppress("MUST_BE_INITIALIZED_OR_BE_ABSTRACT")
-        public val POSITIVE_INFINITY: Float
+        public const val POSITIVE_INFINITY: Float = 1.0F/0.0F
 
         /**
          * A constant holding the negative infinity value of Float.
          */
-        @Suppress("MUST_BE_INITIALIZED_OR_BE_ABSTRACT")
-        public val NEGATIVE_INFINITY: Float
+        public const val NEGATIVE_INFINITY: Float = -1.0F/0.0F
 
         /**
          * A constant holding the "not a number" value of Float.
          */
-        @Suppress("MUST_BE_INITIALIZED_OR_BE_ABSTRACT")
-        public val NaN: Float
+        public const val NaN: Float = -(0.0F/0.0F)
+
+        /**
+         * The number of bytes used to represent an instance of Float in a binary form.
+         */
+        @SinceKotlin("1.4")
+        public const val SIZE_BYTES: Int = 4
+
+        /**
+         * The number of bits used to represent an instance of Float in a binary form.
+         */
+        @SinceKotlin("1.4")
+        public const val SIZE_BITS: Int = 32
     }
 
     /**
@@ -848,25 +810,6 @@ public class Float private constructor() : Number(), Comparable<Float> {
     public operator fun div(other: Double): Double
 
     /** Calculates the remainder of dividing this value by the other value. */
-    @Deprecated("Use rem(other) instead", ReplaceWith("rem(other)"), DeprecationLevel.ERROR)
-    public operator fun mod(other: Byte): Float
-    /** Calculates the remainder of dividing this value by the other value. */
-    @Deprecated("Use rem(other) instead", ReplaceWith("rem(other)"), DeprecationLevel.ERROR)
-    public operator fun mod(other: Short): Float
-    /** Calculates the remainder of dividing this value by the other value. */
-    @Deprecated("Use rem(other) instead", ReplaceWith("rem(other)"), DeprecationLevel.ERROR)
-    public operator fun mod(other: Int): Float
-    /** Calculates the remainder of dividing this value by the other value. */
-    @Deprecated("Use rem(other) instead", ReplaceWith("rem(other)"), DeprecationLevel.ERROR)
-    public operator fun mod(other: Long): Float
-    /** Calculates the remainder of dividing this value by the other value. */
-    @Deprecated("Use rem(other) instead", ReplaceWith("rem(other)"), DeprecationLevel.ERROR)
-    public operator fun mod(other: Float): Float
-    /** Calculates the remainder of dividing this value by the other value. */
-    @Deprecated("Use rem(other) instead", ReplaceWith("rem(other)"), DeprecationLevel.ERROR)
-    public operator fun mod(other: Double): Double
-
-    /** Calculates the remainder of dividing this value by the other value. */
     @SinceKotlin("1.1")
     public operator fun rem(other: Byte): Float
     /** Calculates the remainder of dividing this value by the other value. */
@@ -939,6 +882,10 @@ public class Float private constructor() : Number(), Comparable<Float> {
      * The resulting `Double` value represents the same numerical value as this `Float`.
      */
     public override fun toDouble(): Double
+
+    public override fun equals(other: Any?): Boolean
+    public override fun hashCode(): Int
+    public override fun toString(): String
 }
 
 /**
@@ -950,32 +897,39 @@ public class Double private constructor() : Number(), Comparable<Double> {
         /**
          * A constant holding the smallest *positive* nonzero value of Double.
          */
-        @Suppress("MUST_BE_INITIALIZED_OR_BE_ABSTRACT")
-        public val MIN_VALUE: Double
+        public const val MIN_VALUE: Double = 4.9E-324
 
         /**
          * A constant holding the largest positive finite value of Double.
          */
-        @Suppress("MUST_BE_INITIALIZED_OR_BE_ABSTRACT")
-        public val MAX_VALUE: Double
+        public const val MAX_VALUE: Double = 1.7976931348623157E308
 
         /**
          * A constant holding the positive infinity value of Double.
          */
-        @Suppress("MUST_BE_INITIALIZED_OR_BE_ABSTRACT")
-        public val POSITIVE_INFINITY: Double
+        public const val POSITIVE_INFINITY: Double = 1.0/0.0
 
         /**
          * A constant holding the negative infinity value of Double.
          */
-        @Suppress("MUST_BE_INITIALIZED_OR_BE_ABSTRACT")
-        public val NEGATIVE_INFINITY: Double
+        public const val NEGATIVE_INFINITY: Double = -1.0/0.0
 
         /**
          * A constant holding the "not a number" value of Double.
          */
-        @Suppress("MUST_BE_INITIALIZED_OR_BE_ABSTRACT")
-        public val NaN: Double
+        public const val NaN: Double = -(0.0/0.0)
+
+        /**
+         * The number of bytes used to represent an instance of Double in a binary form.
+         */
+        @SinceKotlin("1.4")
+        public const val SIZE_BYTES: Int = 8
+
+        /**
+         * The number of bits used to represent an instance of Double in a binary form.
+         */
+        @SinceKotlin("1.4")
+        public const val SIZE_BITS: Int = 64
     }
 
     /**
@@ -1073,25 +1027,6 @@ public class Double private constructor() : Number(), Comparable<Double> {
     public operator fun div(other: Double): Double
 
     /** Calculates the remainder of dividing this value by the other value. */
-    @Deprecated("Use rem(other) instead", ReplaceWith("rem(other)"), DeprecationLevel.ERROR)
-    public operator fun mod(other: Byte): Double
-    /** Calculates the remainder of dividing this value by the other value. */
-    @Deprecated("Use rem(other) instead", ReplaceWith("rem(other)"), DeprecationLevel.ERROR)
-    public operator fun mod(other: Short): Double
-    /** Calculates the remainder of dividing this value by the other value. */
-    @Deprecated("Use rem(other) instead", ReplaceWith("rem(other)"), DeprecationLevel.ERROR)
-    public operator fun mod(other: Int): Double
-    /** Calculates the remainder of dividing this value by the other value. */
-    @Deprecated("Use rem(other) instead", ReplaceWith("rem(other)"), DeprecationLevel.ERROR)
-    public operator fun mod(other: Long): Double
-    /** Calculates the remainder of dividing this value by the other value. */
-    @Deprecated("Use rem(other) instead", ReplaceWith("rem(other)"), DeprecationLevel.ERROR)
-    public operator fun mod(other: Float): Double
-    /** Calculates the remainder of dividing this value by the other value. */
-    @Deprecated("Use rem(other) instead", ReplaceWith("rem(other)"), DeprecationLevel.ERROR)
-    public operator fun mod(other: Double): Double
-
-    /** Calculates the remainder of dividing this value by the other value. */
     @SinceKotlin("1.1")
     public operator fun rem(other: Byte): Double
     /** Calculates the remainder of dividing this value by the other value. */
@@ -1166,5 +1101,9 @@ public class Double private constructor() : Number(), Comparable<Double> {
     public override fun toFloat(): Float
     /** Returns this value. */
     public override fun toDouble(): Double
+
+    public override fun equals(other: Any?): Boolean
+    public override fun hashCode(): Int
+    public override fun toString(): String
 }
 

@@ -71,6 +71,18 @@ class CollectionTest {
         assertEquals(listOf("value1", "value2"), l3)
     }
 
+    @Test fun setOfNotNull() {
+        val l1: Set<Int> = setOfNotNull(null)
+        assertTrue(l1.isEmpty())
+
+        val s: String? = "value"
+        val l2: Set<String> = setOfNotNull(s)
+        assertEquals(s, l2.single())
+
+        val l3: Set<String> = setOfNotNull("value1", null, "value2")
+        assertEquals(setOf("value1", "value2"), l3)
+    }
+
     @Test fun filterIntoSet() {
         val data = listOf("foo", "bar")
         val foo = data.filterTo(hashSetOf<String>()) { it.startsWith("f") }
@@ -284,6 +296,24 @@ class CollectionTest {
         }
     }
 
+    @Test fun reduceIndexedOrNull() {
+        expect("123") {
+            val list = listOf("1", "2", "3", "4")
+            list.reduceIndexedOrNull { index, a, b -> if (index == 3) a else a + b }
+        }
+
+        expect(5) {
+            listOf(2, 3).reduceIndexedOrNull { index, acc: Number, e ->
+                assertEquals(1, index)
+                assertEquals(2, acc)
+                assertEquals(3, e)
+                acc.toInt() + e
+            }
+        }
+
+        expect(null, { arrayListOf<Int>().reduceIndexedOrNull { index, a, b -> index + a + b } })
+    }
+
     @Test fun reduceRightIndexed() {
         expect("234") {
             val list = listOf("1", "2", "3", "4")
@@ -302,6 +332,24 @@ class CollectionTest {
         assertFailsWith<UnsupportedOperationException> {
             arrayListOf<Int>().reduceRightIndexed { index, a, b -> index + a + b }
         }
+    }
+
+    @Test fun reduceRightIndexedOrNull() {
+        expect("234") {
+            val list = listOf("1", "2", "3", "4")
+            list.reduceRightIndexedOrNull { index, a, b -> if (index == 0) b else a + b }
+        }
+
+        expect(1) {
+            listOf(2, 3).reduceRightIndexedOrNull { index, e, acc: Number ->
+                assertEquals(0, index)
+                assertEquals(3, acc)
+                assertEquals(2, e)
+                acc.toInt() - e
+            }
+        }
+
+        expect(null, { arrayListOf<Int>().reduceRightIndexedOrNull { index, a, b -> index + a + b } })
     }
 
     @Test fun reduce() {
@@ -342,6 +390,38 @@ class CollectionTest {
         }
 
         expect(null, { arrayListOf<Int>().reduceRightOrNull { a, b -> a + b } })
+    }
+
+    @Test
+    fun scan() {
+        for (size in 0 until 4) {
+            val expected = listOf("", "0", "01", "012", "0123").take(size + 1)
+            assertEquals(expected, List(size) { it }.scan("") { acc, e -> acc + e })
+        }
+    }
+
+    @Test
+    fun scanIndexed() {
+        for (size in 0 until 4) {
+            val expected = listOf("+", "+[0: a]", "+[0: a][1: b]", "+[0: a][1: b][2: c]", "+[0: a][1: b][2: c][3: d]").take(size + 1)
+            assertEquals(expected, List(size) { 'a' + it }.scanIndexed("+") { index, acc, e -> "$acc[$index: $e]" })
+        }
+    }
+
+    @Test
+    fun scanReduce() {
+        for (size in 0 until 4) {
+            val expected = listOf(0, 1, 3, 6).take(size)
+            assertEquals(expected, List(size) { it }.scanReduce { acc, e -> acc + e })
+        }
+    }
+
+    @Test
+    fun scanReduceIndexed() {
+        for (size in 0 until 4) {
+            val expected = listOf(0, 1, 6, 27).take(size)
+            assertEquals(expected, List(size) { it }.scanReduceIndexed { index, acc, e -> index * (acc + e) })
+        }
     }
 
     @Test fun groupBy() {

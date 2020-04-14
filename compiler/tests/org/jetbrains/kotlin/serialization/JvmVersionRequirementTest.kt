@@ -21,6 +21,7 @@ import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment
 import org.jetbrains.kotlin.config.*
 import org.jetbrains.kotlin.descriptors.ModuleDescriptor
 import org.jetbrains.kotlin.jvm.compiler.LoadDescriptorUtil
+import org.jetbrains.kotlin.metadata.ProtoBuf.VersionRequirement.VersionKind.LANGUAGE_VERSION
 import org.jetbrains.kotlin.metadata.ProtoBuf.VersionRequirement.VersionKind.COMPILER_VERSION
 import org.jetbrains.kotlin.metadata.deserialization.VersionRequirement
 import org.jetbrains.kotlin.resolve.lazy.JvmResolveUtil
@@ -30,7 +31,12 @@ import org.jetbrains.kotlin.test.TestJdkKind
 import java.io.File
 
 class JvmVersionRequirementTest : AbstractVersionRequirementTest() {
-    override fun compileFiles(files: List<File>, outputDirectory: File, languageVersion: LanguageVersion) {
+    override fun compileFiles(
+        files: List<File>,
+        outputDirectory: File,
+        languageVersion: LanguageVersion,
+        analysisFlags: Map<AnalysisFlag<*>, Any?>
+    ) {
         LoadDescriptorUtil.compileKotlinToDirAndGetModule(
             listOf(File("compiler/testData/versionRequirement/${getTestName(true)}.kt")), outputDirectory,
             KotlinCoreEnvironment.createForTests(
@@ -40,10 +46,7 @@ class JvmVersionRequirementTest : AbstractVersionRequirementTest() {
                     languageVersionSettings = LanguageVersionSettingsImpl(
                         languageVersion,
                         ApiVersion.createByLanguageVersion(languageVersion),
-                        mapOf(
-                            JvmAnalysisFlags.jvmDefaultMode to JvmDefaultMode.ENABLE,
-                            AnalysisFlags.explicitApiVersion to true
-                        ),
+                        analysisFlags.toMap() + mapOf(AnalysisFlags.explicitApiVersion to true),
                         emptyMap()
                     )
                 },
@@ -63,9 +66,45 @@ class JvmVersionRequirementTest : AbstractVersionRequirementTest() {
     fun testJvmDefault() {
         doTest(
             VersionRequirement.Version(1, 2, 40), DeprecationLevel.ERROR, null, COMPILER_VERSION, null,
-            fqNames = listOf(
+            analysisFlags = mapOf(JvmAnalysisFlags.jvmDefaultMode to JvmDefaultMode.ENABLE),
+            fqNamesWithRequirements = listOf(
                 "test.Base",
                 "test.Derived"
+            )
+        )
+    }
+
+    fun testAllJvmDefault() {
+        doTest(
+            VersionRequirement.Version(1, 4, 0), DeprecationLevel.ERROR, null, COMPILER_VERSION, null,
+            analysisFlags = mapOf(JvmAnalysisFlags.jvmDefaultMode to JvmDefaultMode.ALL_INCOMPATIBLE),
+            fqNamesWithRequirements = listOf(
+                "test.Base",
+                "test.Derived",
+                "test.BaseWithProperty",
+                "test.DerivedWithProperty",
+                "test.Empty",
+                "test.EmptyWithNested",
+                "test.WithAbstractDeclaration",
+                "test.DerivedFromWithAbstractDeclaration"
+            )
+        )
+    }
+
+    fun testAllCompatibilityJvmDefault() {
+        doTest(
+            VersionRequirement.Version(1, 4, 0), DeprecationLevel.ERROR, null, COMPILER_VERSION, null,
+            analysisFlags = mapOf(JvmAnalysisFlags.jvmDefaultMode to JvmDefaultMode.ALL_COMPATIBILITY),
+            fqNamesWithRequirements = emptyList(),
+            fqNamesWithoutRequirement = listOf(
+                "test.Base",
+                "test.Derived",
+                "test.BaseWithProperty",
+                "test.DerivedWithProperty",
+                "test.Empty",
+                "test.EmptyWithNested",
+                "test.WithAbstractDeclaration",
+                "test.DerivedFromWithAbstractDeclaration"
             )
         )
     }
@@ -73,19 +112,36 @@ class JvmVersionRequirementTest : AbstractVersionRequirementTest() {
     fun testJvmFieldInInterfaceCompanion() {
         doTest(
             VersionRequirement.Version(1, 2, 70), DeprecationLevel.ERROR, null, COMPILER_VERSION, null,
-            fqNames = listOf("test.Base.Companion.foo")
+            fqNamesWithRequirements = listOf("test.Base.Companion.foo")
         )
     }
 
     fun testInlineParameterNullCheck() {
         doTest(
             VersionRequirement.Version(1, 3, 50), DeprecationLevel.ERROR, null, COMPILER_VERSION, null,
-            fqNames = listOf(
+            fqNamesWithRequirements = listOf(
                 "test.doRun",
                 "test.lambdaVarProperty",
                 "test.extensionProperty"
             ),
             customLanguageVersion = LanguageVersion.KOTLIN_1_4
+        )
+    }
+
+    fun testSuspendFun_1_2() {
+        doTest(
+            VersionRequirement.Version(1, 1), DeprecationLevel.ERROR, null, LANGUAGE_VERSION, null,
+            customLanguageVersion = LanguageVersion.KOTLIN_1_2,
+            fqNamesWithRequirements = listOf(
+                "test.topLevel",
+                "test.Foo.member",
+                "test.Foo.<init>",
+                "test.async1",
+                "test.async2",
+                "test.async3",
+                "test.async4",
+                "test.asyncVal"
+            )
         )
     }
 }

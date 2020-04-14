@@ -1,6 +1,6 @@
 plugins {
     id("com.android.application")
-    id("kotlin-android")
+    kotlin("android") version "KOTLIN_VERSION"
     id("kotlin-android-extensions")
 }
 group = "testGroupId"
@@ -11,18 +11,20 @@ repositories {
     google()
     jcenter()
     mavenCentral()
+    maven {
+        url = uri("https://dl.bintray.com/kotlin/kotlin-dev")
+    }
 }
 dependencies {
+    implementation("androidx.core:core-ktx:1.2.0")
     implementation("androidx.appcompat:appcompat:1.1.0")
-    implementation("androidx.core:core-ktx:1.1.0")
-    implementation(kotlin("stdlib-jdk7"))
     implementation("androidx.constraintlayout:constraintlayout:1.1.3")
-    implementation(kotlin("stdlib-jdk8"))
+    implementation(kotlin("stdlib-jdk7"))
 }
 android {
     compileSdkVersion(29)
     defaultConfig {
-        applicationId = "testArtifactId"
+        applicationId = "testGroupId.android"
         minSdkVersion(24)
         targetSdkVersion(29)
         versionCode = 1

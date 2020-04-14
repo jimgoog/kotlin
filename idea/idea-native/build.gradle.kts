@@ -5,15 +5,17 @@ plugins {
 
 dependencies {
     compile(project(":idea"))
+    compileOnly(intellijPluginDep("gradle"))
     compile(project(":idea:idea-core"))
     compile(project(":idea:idea-jvm"))
     compile(project(":compiler:frontend"))
+    compile(project(":native:frontend.native"))
+
     compileOnly(intellijDep())
     Platform[192].orHigher {
         compileOnly(intellijPluginDep("java"))
     }
-    compile(project(":kotlin-native:kotlin-native-library-reader"))
-    
+
     testCompileOnly(intellijDep())
     testRuntimeOnly(intellijDep())
 }

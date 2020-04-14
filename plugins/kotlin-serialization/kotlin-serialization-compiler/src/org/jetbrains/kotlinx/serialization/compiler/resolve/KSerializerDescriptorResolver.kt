@@ -1,17 +1,6 @@
 /*
- * Copyright 2010-2017 JetBrains s.r.o.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright 2010-2020 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlinx.serialization.compiler.resolve
@@ -27,8 +16,6 @@ import org.jetbrains.kotlin.incremental.components.NoLookupLocation
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
-import org.jetbrains.kotlin.platform.js.isJs
-import org.jetbrains.kotlin.platform.jvm.isJvm
 import org.jetbrains.kotlin.platform.konan.isNative
 import org.jetbrains.kotlin.psi.synthetics.SyntheticClassOrObjectDescriptor
 import org.jetbrains.kotlin.resolve.BindingContext
@@ -69,13 +56,6 @@ object KSerializerDescriptorResolver {
         if (isSerialInfoImpl(thisDescriptor)) {
             supertypes.add((thisDescriptor.containingDeclaration as LazyClassDescriptor).toSimpleType(false))
         }
-    }
-
-    private fun ClassDescriptor.needSerializerFactory(): Boolean {
-        if (this.platform?.isNative() != true) return false
-        val serializableClass = getSerializableClassDescriptorByCompanion(this) ?: return false
-        if (serializableClass.declaredTypeParameters.isEmpty()) return false
-        return true
     }
 
     fun addSerializerFactorySuperType(classDescriptor: ClassDescriptor, supertypes: MutableList<KotlinType>) {
@@ -224,11 +204,16 @@ object KSerializerDescriptorResolver {
                 shouldAddSerializerFunction { classDescriptor.checkSaveMethodParameters(it.valueParameters) }
         val isLoad = name == SerialEntityNames.LOAD_NAME &&
                 shouldAddSerializerFunction { classDescriptor.checkLoadMethodParameters(it.valueParameters) }
-        val isDescriptorGetter = name == SerialEntityNames.GENERATED_DESCRIPTOR_GETTER &&
+        val isDescriptorGetter = name == SerialEntityNames.CHILD_SERIALIZERS_GETTER &&
                 thisDescriptor.typeConstructor.supertypes.any(::isGeneratedKSerializer) &&
                 shouldAddSerializerFunction { true /* TODO? */ }
 
-        if (isSave || isLoad || isDescriptorGetter) {
+        val isTypeParamsSerializersGetter = name == SerialEntityNames.TYPE_PARAMS_SERIALIZERS_GETTER &&
+                thisDescriptor.typeConstructor.supertypes.any(::isGeneratedKSerializer) &&
+                classDescriptor.declaredTypeParameters.isNotEmpty() &&
+                shouldAddSerializerFunction { true /* TODO? */ }
+
+        if (isSave || isLoad || isDescriptorGetter || isTypeParamsSerializersGetter) {
             result.add(doCreateSerializerFunction(thisDescriptor, name))
         }
     }
@@ -460,7 +445,7 @@ object KSerializerDescriptorResolver {
             declaresDefaultValue = false,
             isCrossinline = false,
             isNoinline = false,
-            varargElementType = serializerClass.defaultType,
+            varargElementType = kSerializerStarType,
             source = f.source
         )
 

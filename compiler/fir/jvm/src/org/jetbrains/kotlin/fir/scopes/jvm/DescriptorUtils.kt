@@ -8,6 +8,8 @@ package org.jetbrains.kotlin.fir.scopes.jvm
 import org.jetbrains.kotlin.fir.declarations.FirFunction
 import org.jetbrains.kotlin.fir.declarations.FirSimpleFunction
 import org.jetbrains.kotlin.fir.types.*
+import org.jetbrains.kotlin.fir.types.impl.FirImplicitAnyTypeRef
+import org.jetbrains.kotlin.fir.types.impl.FirImplicitNullableAnyTypeRef
 import org.jetbrains.kotlin.fir.types.jvm.FirJavaTypeRef
 import org.jetbrains.kotlin.load.java.structure.JavaClass
 import org.jetbrains.kotlin.load.java.structure.JavaClassifierType
@@ -69,7 +71,28 @@ private fun StringBuilder.appendErasedType(typeRef: FirTypeRef) {
     }
 }
 
+private val PRIMITIVE_TYPE_SIGNATURE: Map<String, String> = mapOf(
+    "Boolean" to "Z",
+    "Byte" to "B",
+    "Char" to "C",
+    "Short" to "S",
+    "Int" to "I",
+    "Long" to "L",
+    "Float" to "F",
+    "Double" to "D",
+)
+
 private fun StringBuilder.appendConeType(coneType: ConeKotlinType) {
+    (coneType as? ConeClassLikeType)?.let {
+        val classId = it.lookupTag.classId
+        if (classId.packageFqName.toString() == "kotlin") {
+            PRIMITIVE_TYPE_SIGNATURE[classId.shortClassName.identifier]?.let {
+                append(it)
+                return
+            }
+        }
+    }
+
     fun appendClassLikeType(type: ConeClassLikeType) {
         append("L")
         val classId = type.lookupTag.classId
@@ -87,12 +110,19 @@ private fun StringBuilder.appendConeType(coneType: ConeKotlinType) {
             val representative = coneType.lookupTag.typeParameterSymbol.fir.bounds.firstOrNull {
                 (it as? FirResolvedTypeRef)?.type is ConeClassLikeType
             }
-            if (representative == null) {
+            if (representative == null || representative is FirImplicitNullableAnyTypeRef || representative is FirImplicitAnyTypeRef) {
                 append("Ljava/lang/Object")
             } else {
                 appendClassLikeType(representative.coneTypeUnsafe())
             }
-            append(coneType.lookupTag.name)
+        }
+        is ConeDefinitelyNotNullType -> {
+            appendConeType(coneType.original)
+            return
+        }
+        is ConeFlexibleType -> {
+            appendConeType(coneType.lowerBound)
+            return
         }
     }
     append(";")

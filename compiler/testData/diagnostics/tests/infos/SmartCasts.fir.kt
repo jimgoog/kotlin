@@ -127,12 +127,12 @@ fun f13(a : A?) {
 fun f14(a : A?) {
   while (!(a is B)) {
   }
-  a.<!UNRESOLVED_REFERENCE!>bar<!>()
+  a.bar()
 }
 fun f15(a : A?) {
   do {
   } while (!(a is B))
-  a.<!UNRESOLVED_REFERENCE!>bar<!>()
+  a.bar()
 }
 
 fun getStringLength(obj : Any) : Char? {
@@ -196,7 +196,7 @@ fun mergeSmartCasts(a: Any?) {
     a.<!INAPPLICABLE_CANDIDATE!>compareTo<!>("")
   }
   when (a) {
-    is String, is Any -> a.compareTo("")
+    is String, is Any -> a.<!UNRESOLVED_REFERENCE!>compareTo<!>("")
   }
   if (a is String && a is Any) {
     val i: Int = a.compareTo("")

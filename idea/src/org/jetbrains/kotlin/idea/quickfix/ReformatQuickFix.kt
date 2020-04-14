@@ -8,16 +8,26 @@ package org.jetbrains.kotlin.idea.quickfix
 import com.intellij.codeInspection.LocalQuickFix
 import com.intellij.codeInspection.ProblemDescriptor
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.TextRange
+import com.intellij.psi.PsiElement
 import com.intellij.psi.codeStyle.CodeStyleManager
+import org.jetbrains.kotlin.psi.psiUtil.createSmartPointer
 
-class ReformatQuickFix(val description: String) : LocalQuickFix {
+class ReformatQuickFix(private val description: String, element: PsiElement? = null, val textRange: TextRange? = null) : LocalQuickFix {
+    private val elementPoint = element?.createSmartPointer()
+
     override fun getName(): String = description
 
     override fun getFamilyName(): String = name
 
     override fun applyFix(project: Project, descriptor: ProblemDescriptor) {
-        descriptor.psiElement?.let {
-            CodeStyleManager.getInstance(project).reformat(it)
+        (elementPoint?.element ?: descriptor.psiElement)?.let {
+            val codeStyleManager = CodeStyleManager.getInstance(project)
+            if (textRange != null) {
+                codeStyleManager.reformatRange(it, textRange.startOffset, textRange.endOffset)
+            } else {
+                codeStyleManager.reformat(it)
+            }
         }
     }
 }

@@ -32,6 +32,12 @@ public class IrSteppingTestGenerated extends AbstractIrSteppingTest {
     }
 
     @Test
+    @TestMetadata("assertion.kt")
+    public void testAssertion() throws Exception {
+        runTest("compiler/testData/debug/stepping/assertion.kt");
+    }
+
+    @Test
     @TestMetadata("callableReference.kt")
     public void testCallableReference() throws Exception {
         runTest("compiler/testData/debug/stepping/callableReference.kt");
@@ -41,6 +47,12 @@ public class IrSteppingTestGenerated extends AbstractIrSteppingTest {
     @TestMetadata("conjunction.kt")
     public void testConjunction() throws Exception {
         runTest("compiler/testData/debug/stepping/conjunction.kt");
+    }
+
+    @Test
+    @TestMetadata("for.kt")
+    public void testFor() throws Exception {
+        runTest("compiler/testData/debug/stepping/for.kt");
     }
 
     @Test
@@ -62,6 +74,12 @@ public class IrSteppingTestGenerated extends AbstractIrSteppingTest {
     }
 
     @Test
+    @TestMetadata("iincStepping.kt")
+    public void testIincStepping() throws Exception {
+        runTest("compiler/testData/debug/stepping/iincStepping.kt");
+    }
+
+    @Test
     @TestMetadata("inlineCallableReference.kt")
     public void testInlineCallableReference() throws Exception {
         runTest("compiler/testData/debug/stepping/inlineCallableReference.kt");
@@ -80,9 +98,33 @@ public class IrSteppingTestGenerated extends AbstractIrSteppingTest {
     }
 
     @Test
+    @TestMetadata("nestedInline.kt")
+    public void testNestedInline() throws Exception {
+        runTest("compiler/testData/debug/stepping/nestedInline.kt");
+    }
+
+    @Test
     @TestMetadata("recursion.kt")
     public void testRecursion() throws Exception {
         runTest("compiler/testData/debug/stepping/recursion.kt");
+    }
+
+    @Test
+    @TestMetadata("simpleDefaultArg.kt")
+    public void testSimpleDefaultArg() throws Exception {
+        runTest("compiler/testData/debug/stepping/simpleDefaultArg.kt");
+    }
+
+    @Test
+    @TestMetadata("simpleDefaultArgWithInline.kt")
+    public void testSimpleDefaultArgWithInline() throws Exception {
+        runTest("compiler/testData/debug/stepping/simpleDefaultArgWithInline.kt");
+    }
+
+    @Test
+    @TestMetadata("simpleInlineDefaultArg.kt")
+    public void testSimpleInlineDefaultArg() throws Exception {
+        runTest("compiler/testData/debug/stepping/simpleInlineDefaultArg.kt");
     }
 
     @Test

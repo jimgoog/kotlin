@@ -52,10 +52,10 @@ fun box(): String {
     checkMethodExists(TestClass::class.java, "setFoo", String::class.java, String::class.java)
 
     val test2DefaultImpls = java.lang.Class.forName("Test2\$DefaultImpls")
-    checkNoMethod(test2DefaultImpls, "getTest", String::class.java)
-    checkNoMethod(test2DefaultImpls, "getTest", Any::class.java)
-    checkNoMethod(test2DefaultImpls, "setTest", Any::class.java, Any::class.java)
-    checkNoMethod(test2DefaultImpls, "setTest", String::class.java, String::class.java)
+    checkNoMethod(test2DefaultImpls, "getTest", Test2::class.java, String::class.java)
+    checkNoMethod(test2DefaultImpls, "getTest", Test2::class.java, Any::class.java)
+    checkNoMethod(test2DefaultImpls, "setTest", Test2::class.java, Any::class.java, Any::class.java)
+    checkNoMethod(test2DefaultImpls, "setTest", Test2::class.java, String::class.java, String::class.java)
 
     return "OK"
 }

@@ -41,7 +41,7 @@ class DeserializedClassDescriptor(
 ) : AbstractClassDescriptor(
     outerContext.storageManager,
     nameResolver.getClassId(classProto.fqName).shortClassName
-) {
+), DeserializedDescriptor {
     private val classId = nameResolver.getClassId(classProto.fqName)
 
     private val modality = ProtoEnumFlags.modality(Flags.MODALITY.get(classProto.flags))
@@ -227,7 +227,7 @@ class DeserializedClassDescriptor(
         }
 
         private val refinedSupertypes = c.storageManager.createLazyValue {
-            @UseExperimental(TypeRefinement::class)
+            @OptIn(TypeRefinement::class)
             kotlinTypeRefiner.refineSupertypes(classDescriptor)
         }
 

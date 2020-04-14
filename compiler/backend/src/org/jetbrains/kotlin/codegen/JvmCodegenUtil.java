@@ -22,6 +22,7 @@ import org.jetbrains.kotlin.codegen.state.GenerationState;
 import org.jetbrains.kotlin.codegen.state.KotlinTypeMapper;
 import org.jetbrains.kotlin.config.ApiVersion;
 import org.jetbrains.kotlin.config.JvmAnalysisFlags;
+import org.jetbrains.kotlin.config.JvmDefaultMode;
 import org.jetbrains.kotlin.config.LanguageVersionSettings;
 import org.jetbrains.kotlin.descriptors.*;
 import org.jetbrains.kotlin.descriptors.impl.AnonymousFunctionDescriptor;
@@ -32,12 +33,16 @@ import org.jetbrains.kotlin.load.java.descriptors.JavaPropertyDescriptor;
 import org.jetbrains.kotlin.load.kotlin.ModuleVisibilityUtilsKt;
 import org.jetbrains.kotlin.metadata.jvm.deserialization.ModuleMapping;
 import org.jetbrains.kotlin.name.Name;
-import org.jetbrains.kotlin.psi.*;
+import org.jetbrains.kotlin.psi.KtCodeFragment;
+import org.jetbrains.kotlin.psi.KtFile;
+import org.jetbrains.kotlin.psi.KtFunction;
+import org.jetbrains.kotlin.psi.KtSuperTypeListEntry;
 import org.jetbrains.kotlin.resolve.BindingContext;
 import org.jetbrains.kotlin.resolve.DescriptorToSourceUtils;
 import org.jetbrains.kotlin.resolve.DescriptorUtils;
 import org.jetbrains.kotlin.resolve.calls.model.ResolvedCall;
 import org.jetbrains.kotlin.resolve.inline.InlineUtil;
+import org.jetbrains.kotlin.resolve.jvm.annotations.JvmAnnotationUtilKt;
 import org.jetbrains.kotlin.resolve.jvm.checkers.PolymorphicSignatureCallChecker;
 import org.jetbrains.kotlin.resolve.scopes.receivers.ReceiverValue;
 import org.jetbrains.kotlin.resolve.scopes.receivers.TransientReceiver;
@@ -53,9 +58,9 @@ import static org.jetbrains.kotlin.codegen.coroutines.CoroutineCodegenUtilKt.SUS
 import static org.jetbrains.kotlin.descriptors.ClassKind.ANNOTATION_CLASS;
 import static org.jetbrains.kotlin.descriptors.ClassKind.INTERFACE;
 import static org.jetbrains.kotlin.descriptors.Modality.FINAL;
-import static org.jetbrains.kotlin.resolve.BindingContext.DELEGATED_PROPERTY_CALL;
+import static org.jetbrains.kotlin.resolve.BindingContext.DELEGATED_PROPERTY_RESOLVED_CALL;
 import static org.jetbrains.kotlin.resolve.DescriptorUtils.isCompanionObject;
-import static org.jetbrains.kotlin.resolve.jvm.annotations.JvmAnnotationUtilKt.hasJvmDefaultAnnotation;
+import static org.jetbrains.kotlin.resolve.calls.tasks.ExplicitReceiverKind.NO_EXPLICIT_RECEIVER;
 import static org.jetbrains.kotlin.resolve.jvm.annotations.JvmAnnotationUtilKt.hasJvmFieldAnnotation;
 
 public class JvmCodegenUtil {
@@ -63,7 +68,7 @@ public class JvmCodegenUtil {
     private JvmCodegenUtil() {
     }
 
-    public static boolean isNonDefaultInterfaceMember(@NotNull CallableMemberDescriptor descriptor) {
+    public static boolean isNonDefaultInterfaceMember(@NotNull CallableMemberDescriptor descriptor, @NotNull JvmDefaultMode jvmDefaultMode) {
         if (!isJvmInterface(descriptor.getContainingDeclaration())) {
             return false;
         }
@@ -71,7 +76,7 @@ public class JvmCodegenUtil {
             return descriptor.getModality() == Modality.ABSTRACT;
         }
 
-        return !hasJvmDefaultAnnotation(descriptor);
+        return !JvmAnnotationUtilKt.isCompiledToJvmDefault(descriptor, jvmDefaultMode);
     }
 
     public static boolean isJvmInterface(@Nullable DeclarationDescriptor descriptor) {
@@ -296,10 +301,16 @@ public class JvmCodegenUtil {
     ) {
         VariableAccessorDescriptor getter = descriptor.getGetter();
         if (getter != null) {
-            Call call = bindingContext.get(DELEGATED_PROPERTY_CALL, getter);
+            ResolvedCall<FunctionDescriptor> call = bindingContext.get(DELEGATED_PROPERTY_RESOLVED_CALL, getter);
             if (call != null) {
-                assert call.getExplicitReceiver() != null : "No explicit receiver for call:" + call;
-                return ((ReceiverValue) call.getExplicitReceiver()).getType();
+                assert call.getExplicitReceiverKind() != NO_EXPLICIT_RECEIVER : "No explicit receiver for call:" + call;
+                ReceiverValue extensionReceiver = call.getExtensionReceiver();
+                if (extensionReceiver != null) return extensionReceiver.getType();
+
+                ReceiverValue dispatchReceiver = call.getDispatchReceiver();
+                if (dispatchReceiver != null) return dispatchReceiver.getType();
+
+                return null;
             }
         }
         return null;

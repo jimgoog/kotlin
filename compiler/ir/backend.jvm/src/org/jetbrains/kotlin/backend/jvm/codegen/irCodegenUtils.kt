@@ -83,11 +83,10 @@ internal val DeclarationDescriptorWithSource.psiElement: PsiElement?
 fun JvmBackendContext.getSourceMapper(declaration: IrClass): DefaultSourceMapper {
     val sourceManager = this.psiSourceManager
     val fileEntry = sourceManager.getFileEntry(declaration.fileParent)
-    check(fileEntry != null) { "No PSI file entry found for class: ${declaration.dump()}" }
     // NOTE: apparently inliner requires the source range to cover the
     //       whole file the class is declared in rather than the class only.
     // TODO: revise
-    val endLineNumber = fileEntry.getSourceRangeInfo(0, fileEntry.maxOffset).endLineNumber
+    val endLineNumber = fileEntry?.getSourceRangeInfo(0, fileEntry.maxOffset)?.endLineNumber ?: 0
     return DefaultSourceMapper(
         SourceInfo.createInfoForIr(
             endLineNumber + 1,
@@ -181,6 +180,10 @@ private fun IrDeclarationWithVisibility.specialCaseVisibility(kind: OwnerKind?):
     }
 
 //    if (memberDescriptor.isEffectivelyInlineOnly()) {
+    if (this is IrFunction && isReifiable()) {
+        return Opcodes.ACC_PUBLIC
+    }
+
     if (isEffectivelyInlineOnly()) {
         return Opcodes.ACC_PRIVATE
     }
@@ -290,7 +293,7 @@ private fun IrDeclarationWithVisibility.isPrivateInlineSuspend(): Boolean =
 fun IrFunction.isInlineOnly() =
     isInline && hasAnnotation(INLINE_ONLY_ANNOTATION_FQ_NAME)
 
-private fun IrFunction.isReifiable() = typeParameters.any { it.isReified }
+fun IrFunction.isReifiable() = typeParameters.any { it.isReified }
 
 // Borrowed with modifications from ImplementationBodyCodegen.java
 

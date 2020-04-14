@@ -96,6 +96,10 @@ object NewCommonSuperTypeCalculator {
         contextStubTypesEqualToAnything: AbstractTypeCheckerContext,
         contextStubTypesNotEqual: AbstractTypeCheckerContext
     ): SimpleTypeMarker {
+        if (types.any { it is ErrorType }) {
+            return ErrorUtils.createErrorType("CST(${types.joinToString()}")
+        }
+
         // i.e. result type also should be marked nullable
         val notAllNotNull =
             types.any { !isStubRelatedType(it) && !AbstractNullabilityChecker.isSubtypeOfAny(contextStubTypesEqualToAnything, it) }
@@ -327,7 +331,7 @@ object NewCommonSuperTypeCalculator {
 
             arguments.add(argument)
         }
-        return createSimpleType(constructor, arguments, nullable = false)
+        return createSimpleType(constructor, arguments, nullable = false, isExtensionFunction = types.all { it.isExtensionFunction() })
     }
 
     private fun TypeSystemCommonSuperTypesContext.uncaptureFromSubtyping(typeArgument: TypeArgumentMarker): TypeArgumentMarker {

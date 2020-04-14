@@ -15,12 +15,12 @@ class A {
 
 fun test() {
     String::ext
-    Obj::ext
+    <!UNRESOLVED_REFERENCE!>Obj::ext<!>
 
     String::ext2
-    A.Companion::ext2
-    A::ext2
+    <!UNRESOLVED_REFERENCE!>A.Companion::ext2<!>
+    <!UNRESOLVED_REFERENCE!>A::ext2<!>
 
-    A::foo
-    A::bar
+    <!UNRESOLVED_REFERENCE!>A::foo<!>
+    <!UNRESOLVED_REFERENCE!>A::bar<!>
 }

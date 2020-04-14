@@ -18,10 +18,10 @@ package org.jetbrains.kotlin.jvm.compiler
 
 import org.jetbrains.kotlin.builtins.KotlinBuiltIns
 import org.jetbrains.kotlin.descriptors.findClassAcrossModuleDependencies
+import org.jetbrains.kotlin.ir.util.findFirstFunction
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
-import org.jetbrains.kotlin.psi2ir.findFirstFunction
 import org.jetbrains.kotlin.psi2ir.findSingleFunction
 import org.jetbrains.kotlin.resolve.lazy.JvmResolveUtil
 import org.jetbrains.kotlin.test.ConfigurationKind
@@ -37,7 +37,7 @@ import org.jetbrains.kotlin.types.upperIfFlexible
 class MemoryOptimizationsTest : KtUsefulTestCase() {
     fun testBasicFlexibleTypeCase() {
         val moduleDescriptor = JvmResolveUtil.analyze(
-                KotlinTestUtils.createEnvironmentWithJdkAndNullabilityAnnotationsFromIdea(myTestRootDisposable, ConfigurationKind.ALL, TestJdkKind.FULL_JDK)
+                KotlinTestUtils.createEnvironmentWithJdkAndNullabilityAnnotationsFromIdea(testRootDisposable, ConfigurationKind.ALL, TestJdkKind.FULL_JDK)
         ).moduleDescriptor
 
         val appendableClass =
@@ -71,7 +71,7 @@ class MemoryOptimizationsTest : KtUsefulTestCase() {
         val environment =
                 KotlinTestUtils
                         .createEnvironmentWithJdkAndNullabilityAnnotationsFromIdea(
-                                myTestRootDisposable, ConfigurationKind.ALL, TestJdkKind.FULL_JDK
+                                testRootDisposable, ConfigurationKind.ALL, TestJdkKind.FULL_JDK
                         )
         val moduleDescriptor =
                 JvmResolveUtil.analyze(

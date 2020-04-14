@@ -20,7 +20,10 @@ import org.jetbrains.kotlin.platform.impl.JvmIdePlatformKind
 import org.jetbrains.kotlin.platform.js.JsPlatform
 import org.jetbrains.kotlin.platform.jvm.JdkPlatform
 import org.jetbrains.kotlin.platform.jvm.JvmPlatform
-import org.jetbrains.kotlin.platform.konan.KonanPlatform
+import org.jetbrains.kotlin.platform.konan.NativePlatform
+import org.jetbrains.kotlin.platform.konan.NativePlatformUnspecifiedTarget
+import org.jetbrains.kotlin.platform.konan.NativePlatforms
+import org.jetbrains.kotlin.platform.konan.legacySerializeToString
 import java.lang.reflect.Modifier
 import kotlin.reflect.KClass
 import kotlin.reflect.full.superclasses
@@ -40,7 +43,7 @@ fun TargetPlatform.createArguments(init: (CommonCompilerArguments).() -> Unit = 
             jvmTarget = (singlePlatform as? JdkPlatform)?.targetVersion?.description ?: JvmTarget.DEFAULT.description
         }
         is JsPlatform -> K2JSCompilerArguments().apply { init() }
-        is KonanPlatform -> FakeK2NativeCompilerArguments().apply { init() }
+        is NativePlatform -> FakeK2NativeCompilerArguments().apply { init() }
         else -> error("Unknown platform $singlePlatform")
     }
 }
@@ -104,19 +107,40 @@ private fun readV1Config(element: Element): KotlinFacetSettings {
     }
 }
 
+// TODO: Introduce new version of facet serialization. See https://youtrack.jetbrains.com/issue/KT-38235
+//  This is necessary to avoid having too much custom logic for platform serialization.
 fun Element.getFacetPlatformByConfigurationElement(): TargetPlatform {
     val platformNames = getAttributeValue("allPlatforms")?.split('/')?.toSet()
-    if (platformNames != null) {
-        return TargetPlatform(CommonPlatforms.allSimplePlatforms
-                                  .flatMap { it.componentPlatforms }
-                                  .filter { platformNames.contains(it.serializeToString()) }
-                                  .toSet())
+    if (platformNames != null && platformNames.isNotEmpty()) {
+        val knownSimplePlatforms = HashMap<String, SimplePlatform>() // serialization presentation to simple platform
+
+        // first, collect serialization presentations for every known simple platform
+        CommonPlatforms.allSimplePlatforms
+            .flatMap { it.componentPlatforms }
+            .forEach { knownSimplePlatforms[it.serializeToString()] = it }
+
+        // next, add legacy aliases for some of the simple platforms; ex: unspecifiedNativePlatform
+        NativePlatformUnspecifiedTarget.let { knownSimplePlatforms[it.legacySerializeToString()] = it }
+
+        val simplePlatforms = platformNames.mapNotNull(knownSimplePlatforms::get)
+        if (simplePlatforms.isNotEmpty()) return TargetPlatform(simplePlatforms.toSet())
+
+        // empty set of simple platforms is not allowed, in such case fallback to legacy algorithm
     }
-    // failed to read list of all platforms. Fallback to legacy algorythm
-    val platformName = getAttributeValue("platform")
-    // this code could be simplified using union after fixing the equals method in SimplePlatform
-    val allPlatforms = ArrayList(CommonPlatforms.allSimplePlatforms).also { it.add(CommonPlatforms.defaultCommonPlatform) }
-    return allPlatforms.firstOrNull { it.oldFashionedDescription == platformName }.orDefault()
+
+    // failed to read list of all platforms. Fallback to legacy algorithm
+    val platformName = getAttributeValue("platform") as String
+
+    return CommonPlatforms.allSimplePlatforms.firstOrNull {
+        // first, look for exact match through all simple platforms
+        it.oldFashionedDescription == platformName
+    } ?: CommonPlatforms.defaultCommonPlatform.takeIf {
+        // then, check exact match for the default common platform
+        it.oldFashionedDescription == platformName
+    } ?: NativePlatforms.unspecifiedNativePlatform.takeIf {
+        // if none of the above succeeded, check if it's an old-style record about native platform (without suffix with target name)
+        it.oldFashionedDescription.startsWith(platformName)
+    }.orDefault() // finally, fallback to the default platform
 }
 
 private fun readV2AndLaterConfig(element: Element): KotlinFacetSettings {
@@ -126,8 +150,15 @@ private fun readV2AndLaterConfig(element: Element): KotlinFacetSettings {
         this.targetPlatform = targetPlatform
         readElementsList(element, "implements", "implement")?.let { implementedModuleNames = it }
         readElementsList(element, "dependsOnModuleNames", "dependsOn")?.let { dependsOnModuleNames = it }
-        readElementsList(element, "externalSystemTestTasks", "externalSystemTestTask")?.let {
-            externalSystemTestTasks = it.mapNotNull { ExternalSystemTestTask.fromStringRepresentation(it) }
+        element.getChild("externalSystemTestTasks")?.let {
+            val testRunTasks = it.getChildren("externalSystemTestTask")
+                .mapNotNull { (it.content.firstOrNull() as? Text)?.textTrim }
+                .mapNotNull { ExternalSystemTestRunTask.fromStringRepresentation(it) }
+            val nativeMainRunTasks = it.getChildren("externalSystemNativeMainRunTask")
+                .mapNotNull { (it.content.firstOrNull() as? Text)?.textTrim }
+                .mapNotNull { ExternalSystemNativeMainRunTask.fromStringRepresentation(it) }
+
+            externalSystemRunTasks = testRunTasks + nativeMainRunTasks
         }
 
         element.getChild("sourceSets")?.let {
@@ -291,9 +322,14 @@ private fun buildChildElement(element: Element, tag: String, bean: Any, filter: 
 private fun KotlinFacetSettings.writeLatestConfig(element: Element) {
     val filter = SkipDefaultsSerializationFilter()
 
-    targetPlatform?.let {
-        element.setAttribute("platform", it.oldFashionedDescription)
-        element.setAttribute("allPlatforms", it.componentPlatforms.map { it.serializeToString() }.sorted().joinToString(separator = "/"))
+    // TODO: Introduce new version of facet serialization. See https://youtrack.jetbrains.com/issue/KT-38235
+    //  This is necessary to avoid having too much custom logic for platform serialization.
+    targetPlatform?.let { targetPlatform ->
+        element.setAttribute("platform", targetPlatform.oldFashionedDescription)
+        element.setAttribute(
+            "allPlatforms",
+            targetPlatform.componentPlatforms.map { it.serializeToString() }.sorted().joinToString(separator = "/")
+        )
     }
     if (!useProjectSettings) {
         element.setAttribute("useProjectSettings", useProjectSettings.toString())
@@ -318,12 +354,24 @@ private fun KotlinFacetSettings.writeLatestConfig(element: Element) {
     if (isHmppEnabled) {
         element.setAttribute("isHmppProject", mppVersion.isHmpp.toString())
     }
-    if (externalSystemTestTasks.isNotEmpty()) {
-        saveElementsList(
-            element,
-            externalSystemTestTasks.map { it.toStringRepresentation() },
-            "externalSystemTestTasks",
-            "externalSystemTestTask"
+    if (externalSystemRunTasks.isNotEmpty()) {
+        element.addContent(
+            Element("externalSystemTestTasks").apply {
+                externalSystemRunTasks.forEach { task ->
+                    when(task) {
+                        is ExternalSystemTestRunTask -> {
+                            addContent(
+                                Element("externalSystemTestTask").apply { addContent(task.toStringRepresentation()) }
+                            )
+                        }
+                        is ExternalSystemNativeMainRunTask -> {
+                            addContent(
+                                Element("externalSystemNativeMainRunTask").apply { addContent(task.toStringRepresentation()) }
+                            )
+                        }
+                    }
+                }
+            }
         )
     }
     if (pureKotlinSourceFolders.isNotEmpty()) {

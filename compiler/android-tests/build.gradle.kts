@@ -1,3 +1,4 @@
+import TaskUtils.useAndroidEmulator
 
 plugins {
     kotlin("jvm")
@@ -13,7 +14,10 @@ dependencies {
     compile(project(":kotlin-reflect"))
     compile(projectTests(":compiler:tests-common"))
     compile(commonDep("junit:junit"))
-    compileOnly(intellijDep()) { includeJars("openapi") }
+
+    Platform[193].orLower {
+        compileOnly(intellijDep()) { includeJars("openapi") }
+    }
 
     testCompile(project(":compiler:incremental-compilation-impl"))
     testCompile(project(":core:descriptors"))
@@ -21,7 +25,11 @@ dependencies {
     testCompile(project(":compiler:frontend.java"))
     testCompile(projectTests(":jps-plugin"))
     testCompile(commonDep("junit:junit"))
-    testCompile(intellijDep()) { includeJars("openapi", "util", "idea", "idea_rt", "groovy-all", rootProject = rootProject) }
+    Platform[193].orLower {
+        testCompile(intellijDep()) { includeJars("openapi", rootProject = rootProject) }
+    }
+
+    testCompile(intellijDep()) { includeJars("util", "idea", "idea_rt", "groovy-all", rootProject = rootProject) }
     Platform[191].orLower {
         testCompile(intellijDep()) { includeJars("jps-builders") }
     }
@@ -52,6 +60,7 @@ projectTest {
     }
 
     workingDir = rootDir
+    useAndroidEmulator(this)
 }
 
 val generateAndroidTests by generator("org.jetbrains.kotlin.android.tests.CodegenTestsOnAndroidGenerator")

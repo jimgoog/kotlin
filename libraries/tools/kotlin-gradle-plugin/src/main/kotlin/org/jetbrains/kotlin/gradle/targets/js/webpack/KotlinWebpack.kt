@@ -23,6 +23,7 @@ import org.jetbrains.kotlin.gradle.targets.js.npm.npmProject
 import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackConfig.Mode
 import org.jetbrains.kotlin.gradle.testing.internal.reportsDir
 import org.jetbrains.kotlin.gradle.utils.injected
+import org.jetbrains.kotlin.gradle.utils.property
 import java.io.File
 import javax.inject.Inject
 
@@ -53,12 +54,13 @@ open class KotlinWebpack : DefaultTask(), RequiresNpmDependencies {
 
     @get:PathSensitive(PathSensitivity.ABSOLUTE)
     @get:InputFile
-    var entry: File? = null
-        get() = field ?: compilation.compileKotlinTask.outputFile
+    var entry: File by property {
+        compilation.compileKotlinTask.outputFile
+    }
 
     init {
         onlyIf {
-            entry!!.exists()
+            entry.exists()
         }
     }
 
@@ -75,25 +77,35 @@ open class KotlinWebpack : DefaultTask(), RequiresNpmDependencies {
     @Input
     var saveEvaluatedConfigFile: Boolean = true
 
+    @Nested
+    val output: KotlinWebpackOutput = KotlinWebpackOutput(
+        library = baseConventions?.archivesBaseName,
+        libraryTarget = KotlinWebpackOutput.Target.UMD
+    )
+
     @get:Internal
     @Deprecated("use destinationDirectory instead", ReplaceWith("destinationDirectory"))
     val outputPath: File
-        get() = destinationDirectory!!
+        get() = destinationDirectory
 
     private val baseConventions: BasePluginConvention?
         get() = project.convention.plugins["base"] as BasePluginConvention?
 
     @get:Internal
-    var destinationDirectory: File? = null
-        get() = field ?: project.buildDir.resolve(baseConventions!!.distsDirName)
+    internal var _destinationDirectory: File? = null
 
     @get:Internal
-    var outputFileName: String? = null
-        get() = field ?: (baseConventions?.archivesBaseName + ".js")
+    val destinationDirectory: File
+        get() = _destinationDirectory ?: project.buildDir.resolve(baseConventions!!.distsDirName)
+
+    @get:Internal
+    var outputFileName: String by property {
+        baseConventions?.archivesBaseName + ".js"
+    }
 
     @get:OutputFile
     open val outputFile: File
-        get() = destinationDirectory!!.resolve(outputFileName!!)
+        get() = destinationDirectory.resolve(outputFileName)
 
     open val configDirectory: File?
         @Optional @InputDirectory get() = project.projectDir.resolve("webpack.config.d").takeIf { it.isDirectory }
@@ -102,7 +114,7 @@ open class KotlinWebpack : DefaultTask(), RequiresNpmDependencies {
     var report: Boolean = false
 
     open val reportDir: File
-        @OutputDirectory get() = project.reportsDir.resolve("webpack").resolve(entry!!.nameWithoutExtension)
+        @OutputDirectory get() = project.reportsDir.resolve("webpack").resolve(entry.nameWithoutExtension)
 
     open val evaluatedConfigFile: File
         @OutputFile get() = reportDir.resolve("webpack.config.evaluated.js")
@@ -113,12 +125,15 @@ open class KotlinWebpack : DefaultTask(), RequiresNpmDependencies {
     @Input
     var sourceMaps: Boolean = true
 
+    @Nested
+    val cssSettings: KotlinWebpackCssSettings = KotlinWebpackCssSettings()
+
     @Input
     @Optional
     var devServer: KotlinWebpackConfig.DevServer? = null
 
     @Input
-    var devtool: KotlinWebpackConfig.Devtool = KotlinWebpackConfig.Devtool.EVAL_SOURCE_MAP
+    var devtool: String = WebpackDevtool.EVAL_SOURCE_MAP
 
     private fun createRunner() = KotlinWebpackRunner(
         compilation.npmProject,
@@ -129,10 +144,12 @@ open class KotlinWebpack : DefaultTask(), RequiresNpmDependencies {
             mode = mode,
             entry = entry,
             reportEvaluatedConfigFile = if (saveEvaluatedConfigFile) evaluatedConfigFile else null,
+            output = output,
             outputPath = destinationDirectory,
             outputFileName = outputFileName,
             configDirectory = configDirectory,
             bundleAnalyzerReportDir = if (report) reportDir else null,
+            cssSettings = cssSettings,
             devServer = devServer,
             devtool = devtool,
             sourceMaps = sourceMaps,

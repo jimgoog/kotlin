@@ -14,16 +14,16 @@ import org.jetbrains.kotlin.cli.common.messages.MessageCollector
 import org.jetbrains.kotlin.cli.common.messages.OutputMessageUtil
 import org.jetbrains.kotlin.cli.jvm.K2JVMCompiler
 import org.jetbrains.kotlin.config.Services
+import org.jetbrains.kotlin.daemon.captureOut
 import org.jetbrains.kotlin.daemon.client.DaemonReportingTargets
 import org.jetbrains.kotlin.daemon.client.KotlinCompilerDaemonClient
 import org.jetbrains.kotlin.daemon.common.*
 import org.jetbrains.kotlin.daemon.common.ReportSeverity
 import org.jetbrains.kotlin.daemon.loggerCompatiblePath
 import org.jetbrains.kotlin.integration.KotlinIntegrationTestBase
-import org.jetbrains.kotlin.scripts.captureOut
 import org.jetbrains.kotlin.test.IgnoreAll
 import org.jetbrains.kotlin.test.KotlinTestUtils
-import org.jetbrains.kotlin.test.testFramework.KtUsefulTestCase
+import org.jetbrains.kotlin.test.testFramework.resetApplicationToNull
 import org.junit.Assert
 import org.junit.runner.RunWith
 import java.io.File
@@ -101,7 +101,7 @@ class CompilerApiTest : KotlinIntegrationTestBase() {
             }
             return code to outputs
         } finally {
-            KtUsefulTestCase.resetApplicationToNull(application)
+            resetApplicationToNull(application)
         }
     }
 

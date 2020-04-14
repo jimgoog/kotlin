@@ -1,10 +1,16 @@
 package org.jetbrains.kotlin.gradle
 
 import org.gradle.api.logging.LogLevel
+import org.jetbrains.kotlin.gradle.plugin.KotlinJsCompilerType
+import org.jetbrains.kotlin.gradle.targets.js.npm.NpmProject
+import org.jetbrains.kotlin.gradle.targets.js.npm.NpmProjectModules
+import org.jetbrains.kotlin.gradle.targets.js.npm.fromSrcPackageJson
 import org.jetbrains.kotlin.gradle.tasks.USING_JS_INCREMENTAL_COMPILATION_MESSAGE
 import org.jetbrains.kotlin.gradle.tasks.USING_JS_IR_BACKEND_MESSAGE
+import org.jetbrains.kotlin.gradle.util.allKotlinFiles
 import org.jetbrains.kotlin.gradle.util.getFileByName
 import org.jetbrains.kotlin.gradle.util.getFilesByNames
+import org.jetbrains.kotlin.gradle.util.jsCompilerType
 import org.jetbrains.kotlin.gradle.util.modify
 import org.junit.Assume.assumeFalse
 import org.junit.Test
@@ -25,6 +31,87 @@ class Kotlin2JsIrGradlePluginIT : AbstractKotlin2JsGradlePluginIT(true) {
             val dts = fileInWorkingDir("build/kotlin2js/main/lib.d.ts")
             assert(dts.exists())
             assert(dts.readText().contains("function bar(): string"))
+        }
+    }
+
+    @Test
+    fun testCleanOutputWithEmptySources() {
+        with(Project("kotlin-js-nodejs-project", GradleVersionRequired.AtLeast("5.3"))) {
+            setupWorkingDir()
+            gradleBuildScript().modify(::transformBuildScriptWithPluginsDsl)
+            gradleSettingsScript().modify(::transformBuildScriptWithPluginsDsl)
+
+            build(
+                "build",
+                options = defaultBuildOptions().copy(jsCompilerType = KotlinJsCompilerType.IR)
+            ) {
+                assertSuccessful()
+
+                assertTasksExecuted(":compileProductionExecutableKotlinJs")
+
+                assertFileExists("build/js/packages/kotlin-js-nodejs/kotlin/kotlin-js-nodejs.js")
+            }
+
+            File("${projectDir.canonicalPath}/src").deleteRecursively()
+
+            gradleBuildScript().appendText(
+                """${"\n"}
+                tasks {
+                    named("compileProductionExecutableKotlinJs").configure {
+                        this as org.jetbrains.kotlin.gradle.targets.js.ir.KotlinJsIrLink
+                        type = org.jetbrains.kotlin.gradle.targets.js.dsl.KotlinJsBinaryType.DEVELOPMENT
+                    }
+                }
+            """.trimIndent()
+            )
+
+            build(
+                "build",
+                options = defaultBuildOptions().copy(jsCompilerType = KotlinJsCompilerType.IR)
+            ) {
+                assertSuccessful()
+
+                assertNoSuchFile("build/js/packages/kotlin-js-nodejs/kotlin/")
+            }
+        }
+    }
+
+    @Test
+    fun testJsCompositeBuild() {
+        val rootProjectName = "js-composite-build"
+        val appProject = transformProjectWithPluginsDsl(
+            projectName = "app",
+            directoryPrefix = rootProjectName,
+            wrapperVersion = GradleVersionRequired.AtLeast("5.4")
+        )
+
+        val libProject = transformProjectWithPluginsDsl(
+            projectName = "lib",
+            directoryPrefix = rootProjectName,
+            wrapperVersion = GradleVersionRequired.AtLeast("5.4")
+        )
+
+        libProject.gradleProperties().appendText(jsCompilerType(KotlinJsCompilerType.IR))
+        appProject.gradleProperties().appendText(jsCompilerType(KotlinJsCompilerType.IR))
+
+        libProject.projectDir.copyRecursively(appProject.projectDir.resolve(libProject.projectDir.name))
+
+        fun Project.asyncVersion(rootModulePath: String, moduleName: String): String =
+            NpmProjectModules(projectDir.resolve(rootModulePath))
+                .require(moduleName)
+                .let { File(it).parentFile.parentFile.resolve(NpmProject.PACKAGE_JSON) }
+                .let { fromSrcPackageJson(it) }
+                .let { it!!.version }
+
+        with(appProject) {
+            build("build") {
+                assertSuccessful()
+                val appAsyncVersion = asyncVersion("build/js/node_modules/app", "async")
+                assertEquals("3.2.0", appAsyncVersion)
+
+                val libAsyncVersion = asyncVersion("build/js/node_modules/lib2", "async")
+                assertEquals("2.6.2", libAsyncVersion)
+            }
         }
     }
 }
@@ -244,7 +331,7 @@ abstract class AbstractKotlin2JsGradlePluginIT(private val irBackend: Boolean) :
             assertSuccessful()
             checkIrCompilationMessage()
             if (irBackend) {
-                assertFileExists(kotlinClassesDir() + "manifest")
+                assertFileExists(kotlinClassesDir() + "default/manifest")
             } else {
                 assertFileExists(kotlinClassesDir() + "kotlin2JsNoOutputFileProject.js")
             }
@@ -265,7 +352,7 @@ abstract class AbstractKotlin2JsGradlePluginIT(private val irBackend: Boolean) :
                 ":compileTestKotlin2Js"
             )
             if (irBackend) {
-                assertFileExists("build/kotlin2js/main/manifest")
+                assertFileExists("build/kotlin2js/main/default/manifest")
             } else {
                 assertFileExists("build/kotlin2js/main/module.js")
             }
@@ -374,11 +461,19 @@ abstract class AbstractKotlin2JsGradlePluginIT(private val irBackend: Boolean) :
 
     @Test
     fun testIncrementalCompilation() = Project("kotlin2JsICProject").run {
+        setupWorkingDir()
+        val modules = listOf("app", "lib")
+        val mainFiles = modules.flatMapTo(LinkedHashSet()) {
+            projectDir.resolve("$it/src/main").allKotlinFiles()
+        }
+
         build("build") {
             assertSuccessful()
             checkIrCompilationMessage()
-            if (!irBackend) { // TODO: Support incremental compilation
-                assertContains(USING_JS_INCREMENTAL_COMPILATION_MESSAGE)
+            assertContains(USING_JS_INCREMENTAL_COMPILATION_MESSAGE)
+            if (irBackend) {
+                assertCompiledKotlinSources(project.relativize(mainFiles))
+            } else {
                 assertCompiledKotlinSources(project.relativize(allKotlinFiles))
             }
         }
@@ -394,10 +489,12 @@ abstract class AbstractKotlin2JsGradlePluginIT(private val irBackend: Boolean) :
         build("build") {
             assertSuccessful()
             checkIrCompilationMessage()
-            // TODO: Support incremental compilation in IR backend
-            if (!irBackend) {
-                assertContains(USING_JS_INCREMENTAL_COMPILATION_MESSAGE)
-                val affectedFiles = project.projectDir.getFilesByNames("A.kt", "useAInLibMain.kt", "useAInAppMain.kt", "useAInAppTest.kt")
+            assertContains(USING_JS_INCREMENTAL_COMPILATION_MESSAGE)
+            val affectedFiles = project.projectDir.getFilesByNames("A.kt", "useAInLibMain.kt", "useAInAppMain.kt", "useAInAppTest.kt")
+            if (irBackend) {
+                // only klib ic is supported for now, so tests are generated non-incrementally with ir backend
+                assertCompiledKotlinSources(project.relativize(affectedFiles.filter { it in mainFiles }))
+            } else {
                 assertCompiledKotlinSources(project.relativize(affectedFiles))
             }
         }
@@ -405,7 +502,9 @@ abstract class AbstractKotlin2JsGradlePluginIT(private val irBackend: Boolean) :
 
     @Test
     fun testIncrementalCompilationDisabled() = Project("kotlin2JsICProject").run {
-        val options = defaultBuildOptions().copy(incrementalJs = false)
+        val options = defaultBuildOptions().run {
+            if (irBackend) copy(incrementalJsKlib = false) else copy(incrementalJs = false)
+        }
 
         build("build", options = options) {
             assertSuccessful()
@@ -415,7 +514,7 @@ abstract class AbstractKotlin2JsGradlePluginIT(private val irBackend: Boolean) :
     }
 
     @Test
-    fun testNewKotlinJsPlugin() = with(Project("kotlin-js-plugin-project", GradleVersionRequired.AtLeast("4.10.2"))) {
+    fun testNewKotlinJsPlugin() = with(Project("kotlin-js-plugin-project", GradleVersionRequired.AtLeast("5.3"))) {
         assumeFalse(irBackend) // TODO: Support IR version of kotlinx.html
         setupWorkingDir()
         gradleBuildScript().modify(::transformBuildScriptWithPluginsDsl)
@@ -461,7 +560,7 @@ abstract class AbstractKotlin2JsGradlePluginIT(private val irBackend: Boolean) :
     }
 
     @Test
-    fun testYarnSetup() = with(Project("yarn-setup", GradleVersionRequired.AtLeast("4.10.2"))) {
+    fun testYarnSetup() = with(Project("yarn-setup", GradleVersionRequired.AtLeast("5.3"))) {
         setupWorkingDir()
         gradleBuildScript().modify(::transformBuildScriptWithPluginsDsl)
         gradleSettingsScript().modify(::transformBuildScriptWithPluginsDsl)
@@ -492,41 +591,62 @@ abstract class AbstractKotlin2JsGradlePluginIT(private val irBackend: Boolean) :
     }
 
     @Test
-    fun testNpmDependenciesClash() = with(Project("npm-dependencies-clash", GradleVersionRequired.AtLeast("4.10.2"))) {
+    fun testNpmDependencies() = with(Project("npm-dependencies", GradleVersionRequired.AtLeast("5.3"))) {
         setupWorkingDir()
         gradleBuildScript().modify(::transformBuildScriptWithPluginsDsl)
 
-        build("test") {
+        build("build") {
             assertSuccessful()
+            assertFileExists("build/js/node_modules/file-dependency")
+            assertFileExists("build/js/node_modules/file-dependency-2")
+            assertFileExists("build/js/node_modules/file-dependency-3/index.js")
         }
     }
 
     @Test
-    fun testBrowserDistribution() = with(Project("kotlin-js-browser-project", GradleVersionRequired.AtLeast("4.10.2"))) {
+    fun testBrowserDistribution() = with(Project("kotlin-js-browser-project", GradleVersionRequired.AtLeast("5.3"))) {
         setupWorkingDir()
         gradleBuildScript().modify(::transformBuildScriptWithPluginsDsl)
         gradleSettingsScript().modify(::transformBuildScriptWithPluginsDsl)
 
+        if (irBackend) {
+            gradleProperties().appendText(jsCompilerType(KotlinJsCompilerType.IR))
+        }
+
         build("build") {
             assertSuccessful()
 
-            assertTasksExecuted(
-                ":app:processDceKotlinJs",
-                ":app:browserProductionWebpack"
-            )
+            assertTasksExecuted(":app:browserProductionWebpack")
 
             assertFileExists("build/js/packages/kotlin-js-browser-base")
             assertFileExists("build/js/packages/kotlin-js-browser-lib")
             assertFileExists("build/js/packages/kotlin-js-browser-app")
-            assertFileExists("build/js/packages/kotlin-js-browser-app/kotlin-dce")
-
-            assertFileExists("build/js/packages/kotlin-js-browser-app/kotlin-dce/kotlin.js")
-            assertFileExists("build/js/packages/kotlin-js-browser-app/kotlin-dce/kotlin-js-browser-app.js")
-            assertFileExists("build/js/packages/kotlin-js-browser-app/kotlin-dce/kotlin-js-browser-lib.js")
-            assertFileExists("build/js/packages/kotlin-js-browser-app/kotlin-dce/kotlin-js-browser-base.js")
 
             assertFileExists("app/build/distributions/app.js")
-            assertFileExists("app/build/distributions/app.js.map")
+
+            if (!irBackend) {
+                assertTasksExecuted(":app:processDceKotlinJs")
+
+                assertFileExists("build/js/packages/kotlin-js-browser-app/kotlin-dce")
+
+                assertFileExists("build/js/packages/kotlin-js-browser-app/kotlin-dce/kotlin.js")
+                assertFileExists("build/js/packages/kotlin-js-browser-app/kotlin-dce/kotlin-js-browser-app.js")
+                assertFileExists("build/js/packages/kotlin-js-browser-app/kotlin-dce/kotlin-js-browser-lib.js")
+                assertFileExists("build/js/packages/kotlin-js-browser-app/kotlin-dce/kotlin-js-browser-base.js")
+
+                assertFileExists("app/build/distributions/app.js.map")
+            }
+        }
+
+        build("clean", "browserDistribution") {
+            assertTasksExecuted(
+                ":app:processResources",
+                ":app:browserDistributeResources"
+            )
+
+            assertFileExists("app/build/distributions/index.html")
         }
     }
+
+
 }

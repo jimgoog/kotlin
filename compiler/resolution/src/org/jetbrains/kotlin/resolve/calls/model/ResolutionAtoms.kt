@@ -8,6 +8,7 @@ package org.jetbrains.kotlin.resolve.calls.model
 import org.jetbrains.kotlin.descriptors.CallableDescriptor
 import org.jetbrains.kotlin.descriptors.ValueParameterDescriptor
 import org.jetbrains.kotlin.resolve.calls.components.CallableReferenceCandidate
+import org.jetbrains.kotlin.resolve.calls.components.ReturnArgumentsInfo
 import org.jetbrains.kotlin.resolve.calls.components.TypeArgumentsToParametersMapper
 import org.jetbrains.kotlin.resolve.calls.components.extractInputOutputTypesFromCallableReferenceExpectedType
 import org.jetbrains.kotlin.resolve.calls.inference.components.FreshVariableNewTypeSubstitutor
@@ -17,6 +18,7 @@ import org.jetbrains.kotlin.resolve.calls.inference.model.NewConstraintError
 import org.jetbrains.kotlin.resolve.calls.inference.model.TypeVariableForCallableReferenceReturnType
 import org.jetbrains.kotlin.resolve.calls.inference.model.TypeVariableForLambdaReturnType
 import org.jetbrains.kotlin.resolve.calls.tasks.ExplicitReceiverKind
+import org.jetbrains.kotlin.resolve.constants.IntegerValueTypeConstant
 import org.jetbrains.kotlin.types.KotlinType
 import org.jetbrains.kotlin.types.TypeConstructor
 import org.jetbrains.kotlin.types.TypeSubstitutor
@@ -69,6 +71,7 @@ abstract class ResolvedCallAtom : ResolvedAtom() {
     abstract val freshVariablesSubstitutor: FreshVariableNewTypeSubstitutor
     abstract val knownParametersSubstitutor: TypeSubstitutor
     abstract val argumentsWithConversion: Map<KotlinCallArgument, SamConversionDescription>
+    abstract val argumentsWithConstantConversion: Map<KotlinCallArgument, IntegerValueTypeConstant>
 }
 
 class SamConversionDescription(
@@ -79,6 +82,12 @@ class SamConversionDescription(
 class ResolvedExpressionAtom(override val atom: ExpressionKotlinCallArgument) : ResolvedAtom() {
     init {
         setAnalyzedResults(listOf())
+    }
+}
+
+class ResolvedSubCallArgument(override val atom: SubKotlinCallArgument) : ResolvedAtom() {
+    init {
+        setAnalyzedResults(listOf(atom.callResult))
     }
 }
 
@@ -100,6 +109,7 @@ class LambdaWithTypeVariableAsExpectedTypeAtom(
 ) : PostponedResolvedAtom() {
     override val inputTypes: Collection<UnwrappedType> get() = listOf(expectedType)
     override val outputType: UnwrappedType? get() = null
+    var isReturnArgumentOfAnotherLambda: Boolean = false
 
     fun setAnalyzed(resolvedLambdaAtom: ResolvedLambdaAtom) {
         setAnalyzedResults(listOf(resolvedLambdaAtom))
@@ -115,14 +125,14 @@ class ResolvedLambdaAtom(
     val typeVariableForLambdaReturnType: TypeVariableForLambdaReturnType?,
     override val expectedType: UnwrappedType?
 ) : PostponedResolvedAtom() {
-    lateinit var resultArguments: List<KotlinCallArgument>
+    lateinit var resultArgumentsInfo: ReturnArgumentsInfo
         private set
 
     fun setAnalyzedResults(
-        resultArguments: List<KotlinCallArgument>,
+        resultArguments: ReturnArgumentsInfo,
         subResolvedAtoms: List<ResolvedAtom>
     ) {
-        this.resultArguments = resultArguments
+        this.resultArgumentsInfo = resultArguments
         setAnalyzedResults(subResolvedAtoms)
     }
 
@@ -224,7 +234,8 @@ open class SingleCallResolutionResult(
 class PartialCallResolutionResult(
     resultCallAtom: ResolvedCallAtom,
     diagnostics: List<KotlinCallDiagnostic>,
-    constraintSystem: ConstraintStorage
+    constraintSystem: ConstraintStorage,
+    val forwardToInferenceSession: Boolean = false
 ) : SingleCallResolutionResult(resultCallAtom, diagnostics, constraintSystem)
 
 class CompletedCallResolutionResult(

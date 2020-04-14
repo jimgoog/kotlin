@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2020 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -9,8 +9,10 @@ import com.intellij.openapi.editor.Editor
 import org.jetbrains.kotlin.builtins.getReturnTypeFromFunctionType
 import org.jetbrains.kotlin.builtins.isExtensionFunctionType
 import org.jetbrains.kotlin.builtins.isFunctionType
+import org.jetbrains.kotlin.builtins.isSuspendFunctionType
 import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.descriptors.*
+import org.jetbrains.kotlin.idea.KotlinBundle
 import org.jetbrains.kotlin.idea.caches.resolve.analyze
 import org.jetbrains.kotlin.idea.caches.resolve.resolveToCall
 import org.jetbrains.kotlin.idea.core.ShortenReferences
@@ -39,11 +41,12 @@ import org.jetbrains.kotlin.types.typeUtil.isUnit
 @Suppress("DEPRECATION")
 class ConvertLambdaToReferenceInspection : IntentionBasedInspection<KtLambdaExpression>(ConvertLambdaToReferenceIntention::class)
 
-open class ConvertLambdaToReferenceIntention(text: String) :
-    SelfTargetingOffsetIndependentIntention<KtLambdaExpression>(KtLambdaExpression::class.java, text) {
-
+open class ConvertLambdaToReferenceIntention(textGetter: () -> String) : SelfTargetingOffsetIndependentIntention<KtLambdaExpression>(
+    KtLambdaExpression::class.java,
+    textGetter
+) {
     @Suppress("unused")
-    constructor() : this("Convert lambda to reference")
+    constructor() : this(KotlinBundle.lazyMessage("convert.lambda.to.reference"))
 
     open fun buildReferenceText(element: KtLambdaExpression) = buildReferenceText(lambdaExpression = element, shortTypes = false)
 
@@ -137,7 +140,8 @@ open class ConvertLambdaToReferenceIntention(text: String) :
         if (lambdaParent is KtLambdaArgument) {
             val outerCalleeDescriptor = lambdaParent.outerCalleeDescriptor() ?: return false
             val lambdaParameterType = outerCalleeDescriptor.valueParameters.lastOrNull()?.type
-            if (lambdaParameterType != null && lambdaParameterType.isFunctionType) {
+            if (lambdaParameterType?.isSuspendFunctionType == true) return false
+            if (lambdaParameterType?.isFunctionType == true) {
                 // For lambda parameter with receiver, conversion is not allowed
                 if (lambdaParameterType.isExtensionFunctionType) return false
                 // Special Unit case (non-Unit returning lambda is accepted here, but non-Unit returning reference is not)
@@ -217,7 +221,6 @@ open class ConvertLambdaToReferenceIntention(text: String) :
     }
 
     companion object {
-
         private fun buildReferenceText(lambdaExpression: KtLambdaExpression, shortTypes: Boolean): String? {
             return when (val singleStatement = lambdaExpression.singleStatementOrNull()) {
                 is KtCallExpression -> {
@@ -231,6 +234,7 @@ open class ConvertLambdaToReferenceIntention(text: String) :
                                 lambdaExpression.getResolutionScope().getImplicitReceiversHierarchy().size == 1 -> "this"
                         else -> descriptor?.name?.let { "this@$it" } ?: return null
                     }
+
                     "$receiverText::${singleStatement.getCallReferencedName()}"
                 }
                 is KtDotQualifiedExpression -> {

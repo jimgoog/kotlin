@@ -948,6 +948,18 @@ class StringTest {
         assertStaticTypeIs<StringBuilder>(result.onEach { })
     }
 
+    @Test
+    fun onEachIndexed() = withOneCharSequenceArg("abcd") { data ->
+        val result = StringBuilder()
+        val newData = data.onEachIndexed { i, e -> result.append(e + i) }
+        assertEquals("aceg", result.toString())
+        assertSame(data, newData)
+
+        // static types test
+        assertStaticTypeIs<String>("x".onEachIndexed { _, _ -> })
+        assertStaticTypeIs<StringBuilder>(result.onEachIndexed { _, _ -> })
+    }
+
 
     @Test fun filter() {
         assertEquals("acdca", ("abcdcba").filter { !it.equals('b') })
@@ -1268,6 +1280,22 @@ class StringTest {
         }
     }
 
+    @Test fun reduceIndexedOrNull() = withOneCharSequenceArg { arg1 ->
+        // get the 3rd character
+        assertEquals('c', arg1("bacfd").reduceIndexedOrNull { index, v, c -> if (index == 2) c else v })
+
+        expect('c') {
+            "ab".reduceIndexedOrNull { index, acc, e ->
+                assertEquals(1, index)
+                assertEquals('a', acc)
+                assertEquals('b', e)
+                e + (e - acc)
+            }
+        }
+
+        expect(null, { arg1("").reduceIndexedOrNull { _, _, _ -> '\n' } })
+    }
+
     @Test fun reduceRightIndexed() = withOneCharSequenceArg { arg1 ->
         // get the 3rd character
         assertEquals('c', arg1("bacfd").reduceRightIndexed { index, c, v -> if (index == 2) c else v })
@@ -1284,6 +1312,22 @@ class StringTest {
         assertFailsWith<UnsupportedOperationException> {
             arg1("").reduceRightIndexed { _, _, _ -> '\n' }
         }
+    }
+
+    @Test fun reduceRightIndexedOrNull() = withOneCharSequenceArg { arg1 ->
+        // get the 3rd character
+        assertEquals('c', arg1("bacfd").reduceRightIndexedOrNull { index, c, v -> if (index == 2) c else v })
+
+        expect('c') {
+            "ab".reduceRightIndexedOrNull { index, e, acc ->
+                assertEquals(0, index)
+                assertEquals('b', acc)
+                assertEquals('a', e)
+                acc + (acc - e)
+            }
+        }
+
+        expect(null, { arg1("").reduceRightIndexedOrNull { _, _, _ -> '\n' } })
     }
 
     @Test fun reduce() = withOneCharSequenceArg { arg1 ->
@@ -1309,6 +1353,47 @@ class StringTest {
         assertEquals('a', arg1("bacfd").reduceOrNull { v, c -> if (v > c) c else v })
 
         expect(null, { arg1("").reduceOrNull { _, _ -> '\n' } })
+    }
+
+
+    @Test
+    fun scan() = withOneCharSequenceArg { arg1 ->
+        for (size in 0 until 4) {
+            assertEquals(
+                listOf("", "0", "01", "012", "0123").take(size + 1),
+                arg1((0 until size).joinToString(separator = "")).scan("") { acc, e -> acc + e }
+            )
+        }
+    }
+
+    @Test
+    fun scanIndexed() = withOneCharSequenceArg { arg1 ->
+        for (size in 0 until 4) {
+            assertEquals(
+                listOf("+", "+[0: a]", "+[0: a][1: b]", "+[0: a][1: b][2: c]", "+[0: a][1: b][2: c][3: d]").take(size + 1),
+                arg1(('a' until 'a' + size).joinToString(separator = "")).scanIndexed("+") { index, acc, e -> "$acc[$index: $e]" }
+            )
+        }
+    }
+
+    @Test
+    fun scanReduce() = withOneCharSequenceArg { arg1 ->
+        for (size in 0 until 4) {
+            assertEquals(
+                listOf(0, 1, 3, 6).take(size).map { it.toChar() },
+                arg1((0.toChar() until size.toChar()).joinToString(separator = "")).scanReduce { acc, e -> acc + e.toInt() }
+            )
+        }
+    }
+
+    @Test
+    fun scanReduceIndexed() = withOneCharSequenceArg { arg1 ->
+        for (size in 0 until 4) {
+            assertEquals(
+                listOf(0, 1, 6, 27).take(size).map { it.toChar() },
+                arg1((0.toChar() until size.toChar()).joinToString(separator = "")).scanReduceIndexed { index, acc, e -> (index * (acc.toInt() + e.toInt())).toChar() }
+            )
+        }
     }
 
     @Test fun groupBy() = withOneCharSequenceArg("abAbaABcD") { data ->

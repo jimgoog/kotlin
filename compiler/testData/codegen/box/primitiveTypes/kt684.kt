@@ -1,7 +1,9 @@
-// IGNORE_BACKEND_FIR: JVM_IR
 // IGNORE_BACKEND: JS_IR
 // TODO: muted automatically, investigate should it be ran for JS or not
 // IGNORE_BACKEND: JS, NATIVE
+
+// StackOverflow with StringBuilder (escape()) on Android 4.4
+// IGNORE_BACKEND: ANDROID
 
 fun escapeChar(c : Char) : String? = when (c) {
   '\\' -> "\\\\"

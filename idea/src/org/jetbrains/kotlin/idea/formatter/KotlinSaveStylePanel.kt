@@ -15,19 +15,21 @@ import com.intellij.ui.components.panels.HorizontalLayout
 import com.intellij.ui.components.panels.VerticalLayout
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
+import org.jetbrains.kotlin.idea.KotlinBundle
+import org.jetbrains.kotlin.idea.KotlinLanguage
 import java.awt.BorderLayout
 import javax.swing.BorderFactory
 import javax.swing.JLabel
 import javax.swing.JList
 import javax.swing.JPanel
 
-class KotlinSaveStylePanel(settings: CodeStyleSettings) : CodeStyleAbstractPanel(settings) {
+class KotlinSaveStylePanel(settings: CodeStyleSettings) : CodeStyleAbstractPanel(KotlinLanguage.INSTANCE, null, settings) {
     override fun getRightMargin() = throw UnsupportedOperationException()
     override fun createHighlighter(scheme: EditorColorsScheme) = throw UnsupportedOperationException()
     override fun getFileType() = throw UnsupportedOperationException()
     override fun getPreviewText(): String? = null
 
-    override fun getTabTitle(): String = "Load/Save"
+    override fun getTabTitle(): String = KotlinBundle.message("formatter.title.load.save")
 
     private data class SaveItem(val label: String, val id: String?)
 
@@ -63,7 +65,7 @@ class KotlinSaveStylePanel(settings: CodeStyleSettings) : CodeStyleAbstractPanel
                             }
                         })
 
-                        add(JLabel("Use defaults from:"))
+                        add(JLabel(KotlinBundle.message("formatter.text.use.defaults.from")))
                         add(saveDefaultsComboBox)
                     })
                 }

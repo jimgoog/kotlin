@@ -13,7 +13,7 @@ class JsScriptEvaluator : ScriptEvaluator {
     private val engine = ScriptEngineNashorn()
 
     override suspend fun invoke(
-        compiledScript: CompiledScript<*>,
+        compiledScript: CompiledScript,
         scriptEvaluationConfiguration: ScriptEvaluationConfiguration
     ): ResultWithDiagnostics<EvaluationResult> {
         return try {
@@ -33,6 +33,7 @@ class JsScriptEvaluator : ScriptEvaluator {
         } catch (e: Exception) {
             ResultWithDiagnostics.Failure(
                 ScriptDiagnostic(
+                    ScriptDiagnostic.unspecifiedError,
                     message = e.localizedMessage,
                     severity = ScriptDiagnostic.Severity.ERROR,
                     exception = e

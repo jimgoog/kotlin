@@ -67,6 +67,12 @@
         <extensionPoint qualifiedName="org.jetbrains.kotlin.scripting.idea.listener"
                         interface="org.jetbrains.kotlin.idea.core.script.configuration.listener.ScriptChangeListener"
                         area="IDEA_PROJECT"/>
+
+        <extensionPoint qualifiedName="org.jetbrains.kotlin.additionalExtractableAnalyser"
+                        interface="org.jetbrains.kotlin.idea.refactoring.introduce.extractionEngine.AdditionalExtractableAnalyser"/>
+
+        <extensionPoint qualifiedName="org.jetbrains.kotlin.experimentalFeature"
+                        interface="org.jetbrains.kotlin.idea.configuration.ExperimentalFeature"/>
     </extensionPoints>
 
     <extensions defaultExtensionNs="org.jetbrains.kotlin">
@@ -127,12 +133,23 @@
                      description="Allow a trailing comma regardless of plugin version"
                      defaultValue="false"
                      restartRequired="false"/>
-        <fileEditorProvider implementation="org.jetbrains.kotlin.idea.scratch.ui.KtScratchFileEditorProvider"/>
-
-        <registryKey key="kotlin.experimental.project.wizard"
-                     description="Use experimental project wizard for creating new Kotlin projects"
+        <registryKey key="kotlin.formatter.allowTrailingCommaOnCallSite"
+                     description="Allow a trailing comma on call-site"
                      defaultValue="false"
                      restartRequired="false"/>
+
+        <registryKey key="kotlin.experimental.new.j2k"
+                     description="Enable new Java to Kotlin converter"
+                     defaultValue="true"
+                     restartRequired="false"/>
+        <registryKey key="kotlin.experimental.project.wizard"
+                     description="Enable new Kotlin project wizard"
+                     defaultValue="false"
+                     restartRequired="false"/>
+
+        <fileEditorProvider implementation="org.jetbrains.kotlin.idea.scratch.ui.KtScratchFileEditorProvider"/>
+
         <moduleBuilder builderClass="org.jetbrains.kotlin.tools.projectWizard.wizard.NewProjectWizardModuleBuilder"/>
+        <jbProtocolCommand implementation="org.jetbrains.kotlin.tools.projectWizard.wizard.OpenNewProjectWizardProtocolCommand"/>
     </extensions>
 </idea-plugin>

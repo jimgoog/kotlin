@@ -29,6 +29,7 @@ import com.intellij.refactoring.rename.UnresolvableCollisionUsageInfo
 import com.intellij.usageView.UsageInfo
 import com.intellij.usageView.UsageViewDescriptor
 import com.intellij.util.containers.MultiMap
+import org.jetbrains.kotlin.idea.KotlinBundle
 import org.jetbrains.kotlin.idea.refactoring.broadcastRefactoringExit
 import org.jetbrains.kotlin.idea.refactoring.changeSignature.usages.KotlinFunctionCallUsage
 import org.jetbrains.kotlin.idea.refactoring.changeSignature.usages.KotlinImplicitReceiverUsage
@@ -41,6 +42,11 @@ class KotlinChangeSignatureProcessor(
     changeInfo: KotlinChangeInfo,
     private val commandName: String
 ) : ChangeSignatureProcessorBase(project, KotlinChangeInfoWrapper(changeInfo)) {
+    init {
+        // we must force collecting references to other parameters now before the signature is changed
+        changeInfo.newParameters.forEach { it.defaultValueParameterReferences }
+    }
+
     val ktChangeInfo
         get() = changeInfo.delegate!!
 
@@ -55,7 +61,10 @@ class KotlinChangeSignatureProcessor(
     }
 
     override fun createUsageViewDescriptor(usages: Array<UsageInfo>): UsageViewDescriptor {
-        val subject = if (ktChangeInfo.kind.isConstructor) "constructor" else "function"
+        val subject = if (ktChangeInfo.kind.isConstructor)
+            KotlinBundle.message("text.constructor")
+        else
+            KotlinBundle.message("text.function")
         return KotlinUsagesViewDescriptor(myChangeInfo.method, RefactoringBundle.message("0.to.change.signature", subject))
     }
 

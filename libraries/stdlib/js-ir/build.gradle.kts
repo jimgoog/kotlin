@@ -31,13 +31,18 @@ dependencies {
     fullJsIrCli(project(":js:js.dce"))
     fullJsIrCli(project(":kotlin-reflect"))
     fullJsIrCli(intellijCoreDep()) { includeJars("intellij-core") }
+    if (Platform[193].orLower()) {
+        fullJsIrCli(intellijDep()) {
+            includeJars("picocontainer", rootProject = rootProject)
+        }
+    }
     fullJsIrCli(intellijDep()) {
-        includeJars("picocontainer", "trove4j", "guava", "jdom", "asm-all", rootProject = rootProject)
+        includeJars("trove4j", "guava", "jdom", "asm-all", rootProject = rootProject)
     }
 }
 
 val unimplementedNativeBuiltIns =
-  (file("$rootDir/core/builtins/native/kotlin/").list().toSet() - file("$rootDir/libraries/stdlib/js-ir/builtins/").list())
+  (file("$rootDir/core/builtins/native/kotlin/").list().toSortedSet() - file("$rootDir/libraries/stdlib/js-ir/builtins/").list())
     .map { "core/builtins/native/kotlin/$it" }
 
 // Required to compile native builtins with the rest of runtime
@@ -137,6 +142,7 @@ val reducedRuntimeSources by task<Sync> {
                 "libraries/stdlib/js/src/kotlin/promise.kt",
                 "libraries/stdlib/js/src/kotlin/regexp.kt",
                 "libraries/stdlib/js/src/kotlin/sequence.kt",
+                "libraries/stdlib/js/src/kotlin/throwableExtensions.kt",
                 "libraries/stdlib/js/src/kotlin/text/**",
                 "libraries/stdlib/js/src/kotlin/reflect/KTypeHelpers.kt",
                 "libraries/stdlib/js/src/kotlin/reflect/KTypeParameterImpl.kt",
@@ -162,13 +168,26 @@ val reducedRuntimeSources by task<Sync> {
     into("$buildDir/reducedRuntime/src")
 }
 
-fun JavaExec.buildKLib(moduleName: String, sources: List<String>, dependencies: List<String>, outPath: String, commonSources: List<String>) {
+fun JavaExec.buildKLib(
+    moduleName: String,
+    sources: List<File>,
+    dependencies: List<File>,
+    outDir: File,
+    commonSources: List<File>
+) {
     inputs.files(sources)
-    outputs.dir(file(outPath).parent)
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+
+    outputs.dir(file(outDir))
+    outputs.cacheIf { true }
+
     classpath = jsIrKlibCli
     main = "org.jetbrains.kotlin.ir.backend.js.GenerateJsIrKlibKt"
     workingDir = rootDir
-    args = sources.toList() + listOf("-n", moduleName, "-o", outPath) + dependencies.flatMap { listOf("-d", it) } + commonSources.flatMap { listOf("-c", it) }
+    args = sources.map(::pathRelativeToWorkingDir) +
+            listOf("-n", moduleName, "-o", pathRelativeToWorkingDir(outDir)) +
+            dependencies.flatMap { listOf("-d", pathRelativeToWorkingDir(it)) } +
+            commonSources.flatMap { listOf("-c", pathRelativeToWorkingDir(it)) }
 
     dependsOn(":compiler:cli-js-klib:jar")
     passClasspathInJar()
@@ -180,10 +199,10 @@ val generateFullRuntimeKLib by eagerTask<NoDebugJavaExec> {
     dependsOn(fullRuntimeSources)
 
     buildKLib(moduleName = "kotlin",
-              sources = listOf(fullRuntimeSources.get().outputs.files.singleFile.path),
+              sources = listOf(fullRuntimeSources.get().outputs.files.singleFile),
               dependencies = emptyList(),
-              outPath = fullRuntimeDir.absolutePath,
-              commonSources = listOf("common", "src", "unsigned").map { "$buildDir/fullRuntime/src/libraries/stdlib/$it" }
+              outDir = fullRuntimeDir,
+              commonSources = listOf("common", "src", "unsigned").map { file("$buildDir/fullRuntime/src/libraries/stdlib/$it") }
     )
 }
 
@@ -197,20 +216,19 @@ val packFullRuntimeKLib by tasks.registering(Jar::class) {
 val generateReducedRuntimeKLib by eagerTask<NoDebugJavaExec> {
     dependsOn(reducedRuntimeSources)
 
-    val outPath = buildDir.resolve("reducedRuntime/klib").absolutePath
     buildKLib(moduleName = "kotlin",
-              sources = listOf(reducedRuntimeSources.get().outputs.files.singleFile.path),
+              sources = listOf(reducedRuntimeSources.get().outputs.files.singleFile),
               dependencies = emptyList(),
-              outPath = outPath,
-              commonSources = listOf("common", "src", "unsigned").map { "$buildDir/reducedRuntime/src/libraries/stdlib/$it" }
+              outDir = buildDir.resolve("reducedRuntime/klib"),
+              commonSources = listOf("common", "src", "unsigned").map { file("$buildDir/reducedRuntime/src/libraries/stdlib/$it") }
     )
 }
 
 val generateWasmRuntimeKLib by eagerTask<NoDebugJavaExec> {
     buildKLib(moduleName = "kotlin",
-              sources = listOf("$rootDir/libraries/stdlib/wasm"),
+              sources = listOf(file("$rootDir/libraries/stdlib/wasm")),
               dependencies = emptyList(),
-              outPath = "$buildDir/wasmRuntime/klib",
+              outDir = file("$buildDir/wasmRuntime/klib"),
               commonSources = emptyList()
     )
 }
@@ -219,15 +237,16 @@ val kotlinTestCommonSources = listOf(
     "$rootDir/libraries/kotlin.test/annotations-common/src/main",
     "$rootDir/libraries/kotlin.test/common/src/main"
 )
+
 val generateKotlinTestKLib by eagerTask<NoDebugJavaExec> {
     dependsOn(generateFullRuntimeKLib)
 
     buildKLib(
         moduleName = "kotlin-test",
-        sources = listOf("$rootDir/libraries/kotlin.test/js/src/main") + kotlinTestCommonSources,
-        dependencies = listOf("${generateFullRuntimeKLib.outputs.files.singleFile.path}/klib"),
-        outPath = "$buildDir/kotlin.test/klib",
-        commonSources = kotlinTestCommonSources
+        sources = (listOf("$rootDir/libraries/kotlin.test/js/src/main") + kotlinTestCommonSources).map(::file),
+        dependencies = listOf(generateFullRuntimeKLib.outputs.files.singleFile),
+        outDir = file("$buildDir/kotlin.test/klib"),
+        commonSources = kotlinTestCommonSources.map(::file)
     )
 }
 
@@ -261,11 +280,11 @@ fun JavaExec.buildJs(sources: List<String>, dependencies: List<String>, outPath:
      sources.toList() + listOf("-output", outPath) + libraryArgs + listOf(
          "-Xir-produce-js",
          "-Xmulti-platform",
-         "-Xuse-experimental=kotlin.Experimental",
-         "-Xuse-experimental=kotlin.contracts.ExperimentalContracts",
-         "-Xuse-experimental=kotlin.ExperimentalMultiplatform",
-         "-Xuse-experimental=kotlin.ExperimentalStdlibApi",
-         "-Xuse-experimental=kotlin.ExperimentalUnsignedTypes"
+         "-Xopt-in=kotlin.RequiresOptIn",
+         "-Xopt-in=kotlin.contracts.ExperimentalContracts",
+         "-Xopt-in=kotlin.ExperimentalMultiplatform",
+         "-Xopt-in=kotlin.ExperimentalStdlibApi",
+         "-Xopt-in=kotlin.ExperimentalUnsignedTypes"
      )
     args = allArgs
 
@@ -283,8 +302,8 @@ val tryRunFullCli by eagerTask<NoDebugJavaExec> {
     buildJs(
         sources = listOf(jsTestDir),
         dependencies = listOf(
-            "${generateFullRuntimeKLib.outputs.files.singleFile.path}/klib",
-            "${generateKotlinTestKLib.outputs.files.singleFile.path}/klib"
+            generateFullRuntimeKLib.outputs.files.singleFile.path,
+            generateKotlinTestKLib.outputs.files.singleFile.path
         ),
         outPath = testOutputFile,
         commonSources = emptyList()
@@ -332,7 +351,7 @@ val runMocha by task<NodeTask> {
     val allArgs = getArgs().toList() + listOf(testOutputFile/*, kotlinTestTestOutputFile*/)
     setArgs(allArgs)
 
-    setIgnoreExitValue(rootProject.getBooleanProperty("ignoreTestFailures") ?: false)
+    setIgnoreExitValue(kotlinBuildProperties.ignoreTestFailures)
     setWorkingDir(buildDir)
 }
 

@@ -6,8 +6,11 @@
 package org.jetbrains.kotlin.gradle.utils
 
 import org.gradle.api.Project
+import org.gradle.api.file.RegularFile
+import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.provider.Provider
+import java.io.File
 import kotlin.properties.ReadOnlyProperty
 import kotlin.reflect.KProperty
 
@@ -34,3 +37,21 @@ private class OptionalProviderDelegate<T>(private val provider: Provider<T?>) : 
 
 internal fun <T> Project.optionalProvider(initialize: () -> T?): ReadOnlyProperty<Any?, T?> =
     OptionalProviderDelegate(provider(initialize))
+
+// Before 5.0 fileProperty is created via ProjectLayout
+// https://docs.gradle.org/current/javadoc/org/gradle/api/model/ObjectFactory.html#fileProperty--
+internal fun Project.newFileProperty(initialize: (() -> File)? = null): RegularFileProperty {
+    val regularFileProperty = if (isGradleVersionAtLeast(5, 0)) {
+        project.objects.fileProperty()
+    } else {
+        val projectLayoutClass = Class.forName("org.gradle.api.file.ProjectLayout")
+        val filePropertyMethod = projectLayoutClass.getMethod("fileProperty")
+        filePropertyMethod(project.layout) as RegularFileProperty
+    }
+
+    return regularFileProperty.apply {
+        if (initialize != null) {
+            set(provider { RegularFile(initialize) })
+        }
+    }
+}

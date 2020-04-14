@@ -26,9 +26,11 @@ fun CompatibilityPredicate.or(other: CompatibilityPredicate): CompatibilityPredi
 }
 
 enum class Platform : CompatibilityPredicate {
-    P183, P191, P192, P193;
+    P183, P191, P192, P193, P201;
 
     val version: Int = name.drop(1).toInt()
+
+    val displayVersion: String = "20${name.drop(1).dropLast(1)}.${name.last()}"
 
     override fun matches(ide: Ide) = ide.platform == this
 
@@ -44,6 +46,7 @@ enum class Ide(val platform: Platform) : CompatibilityPredicate {
     IJ191(Platform.P191),
     IJ192(Platform.P192),
     IJ193(Platform.P193),
+    IJ201(Platform.P201),
 
     AS35(Platform.P183),
     AS36(Platform.P192),
@@ -51,6 +54,11 @@ enum class Ide(val platform: Platform) : CompatibilityPredicate {
 
     val kind = Kind.values().first { it.shortName == name.take(2) }
     val version = name.dropWhile { !it.isDigit() }.toInt()
+
+    val displayVersion: String = when (kind) {
+        Kind.IntelliJ -> "IJ${platform.displayVersion}"
+        Kind.AndroidStudio -> "Studio${name.substringAfter("AS").toCharArray().joinToString(separator = ".")}"
+    }
 
     override fun matches(ide: Ide) = ide == this
 

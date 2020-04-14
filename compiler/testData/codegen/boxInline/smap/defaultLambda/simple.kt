@@ -1,4 +1,4 @@
-// IGNORE_BACKEND_MULTI_MODULE: JVM_IR
+
 // FILE: 1.kt
 // SKIP_INLINE_CHECK_IN: inlineFun$default
 
@@ -27,7 +27,6 @@ Kotlin
 test/_1Kt
 *L
 1#1,11:1
-8#1:12
 *E
 
 SMAP

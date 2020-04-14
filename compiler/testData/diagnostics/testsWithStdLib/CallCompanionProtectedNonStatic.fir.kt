@@ -5,7 +5,7 @@ open class VeryBase {
 open class Base {
     protected fun foo() { 
         bar() // Ok
-        <!INAPPLICABLE_CANDIDATE!>baz<!>() // Ok
+        baz() // Ok
     }
 
     inner class Inner {
@@ -13,7 +13,7 @@ open class Base {
             foo() // Ok
             bar() // Ok
             gav() // Ok
-            <!INAPPLICABLE_CANDIDATE!>baz<!>() // Ok
+            baz() // Ok
         }
     }
 
@@ -22,7 +22,7 @@ open class Base {
             foo() // Ok
             bar() // Ok
             gav() // Ok
-            <!INAPPLICABLE_CANDIDATE!>baz<!>() // Ok
+            baz() // Ok
         }
     }
     
@@ -46,8 +46,8 @@ open class Base {
 class Derived : Base() {
     fun test() {
         foo() // Ok
-        <!INAPPLICABLE_CANDIDATE!>gav<!>() // Ok
-        <!INAPPLICABLE_CANDIDATE!>bar<!>()
+        gav() // Ok
+        bar()
         <!INAPPLICABLE_CANDIDATE!>baz<!>()
         prop = 0
     }
@@ -55,8 +55,8 @@ class Derived : Base() {
     inner class DerivedInner {
         fun fromDerivedInner() {
             foo() // Ok
-            <!INAPPLICABLE_CANDIDATE!>gav<!>() // Ok
-            <!INAPPLICABLE_CANDIDATE!>bar<!>()
+            gav() // Ok
+            bar()
             <!INAPPLICABLE_CANDIDATE!>baz<!>()
             prop = 0
         }
@@ -64,8 +64,8 @@ class Derived : Base() {
 
     companion object {
         fun test2() {
-            <!INAPPLICABLE_CANDIDATE!>gav<!>() // Ok
-            <!INAPPLICABLE_CANDIDATE!>bar<!>()
+            gav() // Ok
+            bar()
             <!INAPPLICABLE_CANDIDATE!>baz<!>()
             prop = 0
         }

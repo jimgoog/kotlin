@@ -68,6 +68,14 @@ class BuiltinMembersConversion(context: NewJ2kConverterContext) : RecursiveAppli
                 true
             }
 
+        is JKMethodAccessExpression ->
+            conversions[identifier.deepestFqName()]?.firstOrNull { conversion ->
+                if (conversion.from !is Method) return@firstOrNull false
+                if (conversion.to !is Method) return@firstOrNull false
+                if (conversion.filter?.invoke(this) == false) return@firstOrNull false
+                true
+            }
+
         is JKNewExpression ->
             conversions[classSymbol.deepestFqName()]?.firstOrNull { conversion ->
                 if (conversion.from !is NewExpression) return@firstOrNull false
@@ -93,21 +101,23 @@ class BuiltinMembersConversion(context: NewJ2kConverterContext) : RecursiveAppli
                         symbolProvider.provideMethodSymbol(fqName),
                         argumentsProvider(from::arguments.detached()),
                         from::typeArgumentList.detached()
-                    ).withFormattingFrom(from)
+                    )
                 is JKFieldAccessExpression ->
                     JKCallExpressionImpl(
                         symbolProvider.provideMethodSymbol(fqName),
                         JKArgumentList(),
                         JKTypeArgumentList()
-                    ).withFormattingFrom(from)
+                    )
+                is JKMethodAccessExpression ->
+                    JKMethodAccessExpression(symbolProvider.provideMethodSymbol(fqName))
                 is JKNewExpression ->
                     JKCallExpressionImpl(
                         symbolProvider.provideMethodSymbol(fqName),
                         argumentsProvider(from::arguments.detached()),
                         JKTypeArgumentList()
-                    ).withFormattingFrom(from)
+                    )
                 else -> error("Bad conversion")
-            }
+            }.withFormattingFrom(from)
     }
 
     private inner class FieldBuilder(
@@ -224,6 +234,13 @@ class BuiltinMembersConversion(context: NewJ2kConverterContext) : RecursiveAppli
                     withReplaceType ReplaceType.REPLACE_WITH_QUALIFIER,
             Method("java.lang.Double.parseDouble") convertTo ExtensionMethod("kotlin.text.toDouble")
                     withReplaceType ReplaceType.REPLACE_WITH_QUALIFIER,
+
+            Method("java.lang.Number.byteValue") convertTo Method("kotlin.Number.toByte"),
+            Method("java.lang.Number.doubleValue") convertTo Method("kotlin.Number.toDouble"),
+            Method("java.lang.Number.floatValue") convertTo Method("kotlin.Number.toFloat"),
+            Method("java.lang.Number.intValue") convertTo Method("kotlin.Number.toInt"),
+            Method("java.lang.Number.longValue") convertTo Method("kotlin.Number.toLong"),
+            Method("java.lang.Number.shortValue") convertTo Method("kotlin.Number.toShort"),
 
             Field("java.lang.Byte.MIN_VALUE") convertTo Field("kotlin.Byte.Companion.MIN_VALUE")
                     withReplaceType ReplaceType.REPLACE_WITH_QUALIFIER,

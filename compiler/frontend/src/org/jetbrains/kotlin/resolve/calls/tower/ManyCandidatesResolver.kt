@@ -85,7 +85,8 @@ abstract class ManyCandidatesResolver<D : CallableDescriptor>(
                 constraintSystem.asConstraintSystemCompleterContext(),
                 KotlinConstraintSystemCompleter.ConstraintSystemCompletionMode.FULL,
                 atoms,
-                builtIns.unitType
+                builtIns.unitType,
+                diagnosticHolder
             ) {
                 postponedArgumentsAnalyzer.analyze(
                     constraintSystem.asPostponedArgumentsAnalyzerContext(), resolutionCallbacks, it, diagnosticHolder
@@ -155,6 +156,8 @@ abstract class ManyCandidatesResolver<D : CallableDescriptor>(
         errorCallsInfo.filter { it.callResolutionResult !in results }.mapTo(allCandidates) { ResolutionResultCallInfo(it.callResolutionResult, it.result) }
         return allCandidates
     }
+
+    override fun computeCompletionMode(candidate: KotlinResolutionCandidate) = null
 
     private fun PartialCallInfo.asCallResolutionResult(
         diagnosticsHolder: KotlinDiagnosticsHolder.SimpleHolder,

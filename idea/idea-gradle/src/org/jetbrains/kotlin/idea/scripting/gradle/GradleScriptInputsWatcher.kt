@@ -6,16 +6,12 @@
 package org.jetbrains.kotlin.idea.scripting.gradle
 
 import com.intellij.openapi.components.*
+import com.intellij.openapi.externalSystem.util.ExternalSystemApiUtil
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.openapi.vfs.VirtualFileManager
-import com.intellij.openapi.vfs.newvfs.BulkFileListener
-import com.intellij.openapi.vfs.newvfs.events.VFileEvent
-import com.intellij.util.PathUtil
 import org.jetbrains.annotations.TestOnly
-import org.junit.Assert.assertEquals
-import org.junit.Test
+import org.jetbrains.plugins.gradle.settings.GradleProjectSettings
+import org.jetbrains.plugins.gradle.util.GradleConstants
 
 @State(
     name = "KotlinBuildScriptsModificationInfo",
@@ -24,44 +20,51 @@ import org.junit.Test
 class GradleScriptInputsWatcher(val project: Project) : PersistentStateComponent<GradleScriptInputsWatcher.Storage> {
     private var storage = Storage()
 
-    fun startWatching() {
-        project.messageBus.connect().subscribe(
-            VirtualFileManager.VFS_CHANGES,
-            object : BulkFileListener {
-                override fun after(events: List<VFileEvent>) {
-                    if (project.isDisposed) return
+    private var cachedGradleProjectsRoots: Set<String>? = null
 
-                    val files = getAffectedGradleProjectFiles(project)
-                    for (event in events) {
-                        val file = event.file ?: return
-                        if (isInAffectedGradleProjectFiles(files, event.path)) {
-                            storage.fileChanged(file, file.timeStamp)
-                        }
-                    }
-                }
-            })
+    fun getGradleProjectsRoots(): Set<String> {
+        if (cachedGradleProjectsRoots == null) {
+            cachedGradleProjectsRoots = computeGradleProjectRoots(project)
+        }
+        return cachedGradleProjectsRoots ?: emptySet()
+    }
+
+    fun saveGradleProjectRootsAfterImport(roots: Set<String>) {
+        val oldRoots = cachedGradleProjectsRoots
+        if (oldRoots != null && oldRoots.isNotEmpty()) {
+            cachedGradleProjectsRoots = oldRoots + roots
+        } else {
+            cachedGradleProjectsRoots = roots
+        }
+    }
+
+    private fun computeGradleProjectRoots(project: Project): Set<String> {
+        val gradleSettings = ExternalSystemApiUtil.getSettings(project, GradleConstants.SYSTEM_ID)
+        if (gradleSettings.getLinkedProjectsSettings().isEmpty()) return setOf()
+
+        val projectSettings = gradleSettings.getLinkedProjectsSettings().filterIsInstance<GradleProjectSettings>().firstOrNull()
+            ?: return setOf()
+
+        return projectSettings.modules.takeIf { it.isNotEmpty() } ?: setOf(projectSettings.externalProjectPath)
+    }
+
+    fun startWatching() {
+        addVfsListener(this)
     }
 
     fun areRelatedFilesUpToDate(file: VirtualFile, timeStamp: Long): Boolean {
-        return storage.lastModifiedTimeStampExcept(file) < timeStamp
+        return storage.lastModifiedTimeStampExcept(file.path) < timeStamp
     }
 
     class Storage {
         private val lastModifiedFiles = LastModifiedFiles()
 
-        fun lastModifiedTimeStampExcept(file: VirtualFile): Long {
-            val fileId = getFileId(file)
-            return lastModifiedFiles.lastModifiedTimeStampExcept(fileId)
+        fun lastModifiedTimeStampExcept(filePath: String): Long {
+            return lastModifiedFiles.lastModifiedTimeStampExcept(filePath)
         }
 
-        fun fileChanged(file: VirtualFile, ts: Long) {
-            val fileId = getFileId(file)
-            lastModifiedFiles.fileChanged(ts, fileId)
-        }
-
-        private fun getFileId(file: VirtualFile): String {
-            val canonized = PathUtil.getCanonicalPath(file.path)
-            return FileUtil.toSystemIndependentName(canonized)
+        fun fileChanged(filePath: String, ts: Long) {
+            lastModifiedFiles.fileChanged(ts, filePath)
         }
     }
 
@@ -73,13 +76,16 @@ class GradleScriptInputsWatcher(val project: Project) : PersistentStateComponent
         this.storage = state
     }
 
-    @TestOnly
-    fun clearAndRefillState() {
-        loadState(project.service<GradleScriptInputsWatcher>().state)
+    fun fileChanged(filePath: String, ts: Long) {
+        storage.fileChanged(filePath, ts)
+    }
+
+    fun clearState() {
+        storage = Storage()
     }
 
     @TestOnly
-    fun fileChanged(file: VirtualFile, ts: Long) {
-        storage.fileChanged(file, ts)
+    fun clearAndRefillState() {
+        loadState(project.service<GradleScriptInputsWatcher>().state)
     }
 }

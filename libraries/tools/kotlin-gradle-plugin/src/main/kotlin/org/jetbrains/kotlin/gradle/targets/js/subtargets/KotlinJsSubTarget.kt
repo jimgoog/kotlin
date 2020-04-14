@@ -6,7 +6,9 @@
 package org.jetbrains.kotlin.gradle.targets.js.subtargets
 
 import org.gradle.api.NamedDomainObjectContainer
+import org.gradle.api.Task
 import org.gradle.api.plugins.ExtensionAware
+import org.gradle.api.tasks.TaskProvider
 import org.gradle.language.base.plugins.LifecycleBasePlugin
 import org.jetbrains.kotlin.gradle.plugin.AbstractKotlinTargetConfigurator
 import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
@@ -24,6 +26,7 @@ import org.jetbrains.kotlin.gradle.tasks.registerTask
 import org.jetbrains.kotlin.gradle.testing.internal.configureConventions
 import org.jetbrains.kotlin.gradle.testing.internal.kotlinTestRegistry
 import org.jetbrains.kotlin.gradle.utils.lowerCamelCaseName
+import org.jetbrains.kotlin.gradle.utils.newFileProperty
 
 abstract class KotlinJsSubTarget(
     val target: KotlinJsTarget,
@@ -37,12 +40,20 @@ abstract class KotlinJsSubTarget(
     final override lateinit var testRuns: NamedDomainObjectContainer<KotlinJsPlatformTestRun>
         private set
 
-    fun configure() {
+    protected val taskGroupName = "Kotlin $disambiguationClassifier"
+
+    private val produceExecutable: Unit by lazy {
+        configureMain()
+    }
+
+    internal fun produceExecutable() {
+        produceExecutable
+    }
+
+    internal fun configure() {
         NpmResolverPlugin.apply(project)
 
-        configureBuildVariants()
         configureTests()
-        configureMain()
 
         target.compilations.all {
             val npmProject = it.npmProject
@@ -57,10 +68,8 @@ abstract class KotlinJsSubTarget(
     protected fun disambiguateCamelCased(vararg names: String): String =
         lowerCamelCaseName(target.disambiguationClassifier, disambiguationClassifier, *names)
 
-    abstract fun configureBuildVariants()
-
     private fun configureTests() {
-        testRuns = project.container(KotlinJsPlatformTestRun::class.java) { name -> KotlinJsPlatformTestRun(name, this) }.also {
+        testRuns = project.container(KotlinJsPlatformTestRun::class.java) { name -> KotlinJsPlatformTestRun(name, target) }.also {
             (this as ExtensionAware).extensions.add(this::testRuns.name, it)
         }
 
@@ -87,6 +96,10 @@ abstract class KotlinJsSubTarget(
 
             testJs.group = LifecycleBasePlugin.VERIFICATION_GROUP
             testJs.description = testTaskDescription
+
+            testJs.inputFileProperty.set(project.newFileProperty {
+                compileTask.outputFile
+            })
 
             testJs.dependsOn(nodeJs.npmInstallTask, compileTask, nodeJs.nodeJsSetupTask)
 
@@ -131,6 +144,15 @@ abstract class KotlinJsSubTarget(
     }
 
     protected abstract fun configureMain(compilation: KotlinJsCompilation)
+
+    internal inline fun <reified T : Task> registerSubTargetTask(
+        name: String,
+        noinline body: (T) -> (Unit)
+    ): TaskProvider<T> =
+        project.registerTask(name) {
+            it.group = taskGroupName
+            body(it)
+        }
 
     companion object {
         const val RUN_TASK_NAME = "run"

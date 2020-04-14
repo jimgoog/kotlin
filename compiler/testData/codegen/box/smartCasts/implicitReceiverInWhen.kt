@@ -1,3 +1,4 @@
+
 open class A {
     fun f(): String =
             when (this) {

@@ -5,6 +5,7 @@
 
 package org.jetbrains.kotlin.types.expressions;
 
+import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.psi.tree.IElementType;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -26,6 +27,7 @@ import org.jetbrains.kotlin.resolve.calls.context.ResolutionContext;
 import org.jetbrains.kotlin.resolve.calls.smartcasts.DataFlowInfo;
 import org.jetbrains.kotlin.resolve.calls.smartcasts.DataFlowValue;
 import org.jetbrains.kotlin.resolve.calls.tower.KotlinResolutionCallbacksImpl;
+import org.jetbrains.kotlin.resolve.calls.tower.LambdaContextInfo;
 import org.jetbrains.kotlin.resolve.scopes.*;
 import org.jetbrains.kotlin.types.ErrorUtils;
 import org.jetbrains.kotlin.types.KotlinType;
@@ -227,7 +229,11 @@ public class ExpressionTypingServices {
                 trace, functionInnerScope, dataFlowInfo, NO_EXPECTED_TYPE, getLanguageVersionSettings(),
                 expressionTypingComponents.dataFlowValueFactory
         );
+
+        KotlinResolutionCallbacksImpl.LambdaInfo lambdaInfo = getNewInferenceLambdaInfo(context, function);
+        context = updateContextFromNILambdaInfo(lambdaInfo, context);
         KotlinTypeInfo typeInfo = expressionTypingFacade.getTypeInfo(bodyExpression, context, function.hasBlockBody());
+        updateLambdaContextInfoForAnonymousFunction(lambdaInfo, typeInfo, context);
 
         KotlinType type = typeInfo.getType();
         if (type != null) {
@@ -236,6 +242,43 @@ public class ExpressionTypingServices {
         else {
             return ErrorUtils.createErrorType("Error function type");
         }
+    }
+
+    private static void updateLambdaContextInfoForAnonymousFunction(
+            @Nullable KotlinResolutionCallbacksImpl.LambdaInfo lambdaInfo,
+            @NotNull KotlinTypeInfo bodyExpressionTypeInfo,
+            @NotNull ExpressionTypingContext context
+    ) {
+        if (lambdaInfo == null) return;
+
+        LambdaContextInfo contextInfo = lambdaInfo.getLastExpressionInfo();
+        contextInfo.setTypeInfo(bodyExpressionTypeInfo);
+        contextInfo.setDataFlowInfoAfter(null);
+        contextInfo.setLexicalScope(context.scope);
+        contextInfo.setTrace(context.trace);
+    }
+
+    private static ExpressionTypingContext updateContextFromNILambdaInfo(
+            @Nullable KotlinResolutionCallbacksImpl.LambdaInfo lambdaInfo,
+            @NotNull ExpressionTypingContext context
+    ) {
+        if (lambdaInfo != null) {
+            context = context
+                    .replaceContextDependency(lambdaInfo.getContextDependency())
+                    .replaceExpectedType(lambdaInfo.getExpectedType());
+        }
+        return context;
+    }
+
+    @Nullable
+    public static KotlinResolutionCallbacksImpl.LambdaInfo getNewInferenceLambdaInfo(
+            @NotNull ExpressionTypingContext context,
+            @NotNull KtElement function
+    ) {
+        if (function instanceof KtFunction) {
+            return context.trace.get(BindingContext.NEW_INFERENCE_LAMBDA_INFO, (KtFunction) function);
+        }
+        return null;
     }
 
     /**
@@ -264,6 +307,7 @@ public class ExpressionTypingServices {
 
         boolean isFirstStatement = true;
         for (Iterator<? extends KtElement> iterator = block.iterator(); iterator.hasNext(); ) {
+            ProgressManager.checkCanceled();
             // Use filtering trace to keep effect system cache only for one statement
             AbstractFilteringTrace traceForSingleStatement = new EffectsFilteringTrace(context.trace);
 
@@ -346,7 +390,7 @@ public class ExpressionTypingServices {
             return blockLevelVisitor.getTypeInfo(statementExpression, context.replaceExpectedType(expectedType), true);
         }
 
-        if (statementExpression instanceof KtLambdaExpression) {
+        if (KtPsiUtil.deparenthesize(statementExpression) instanceof KtLambdaExpression) {
             KotlinTypeInfo typeInfo = createDontCareTypeInfoForNILambda(statementExpression, context);
             if (typeInfo != null) return typeInfo;
         }

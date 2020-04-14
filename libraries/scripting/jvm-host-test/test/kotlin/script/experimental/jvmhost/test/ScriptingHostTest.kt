@@ -8,7 +8,7 @@ package kotlin.script.experimental.jvmhost.test
 import junit.framework.TestCase
 import kotlinx.coroutines.runBlocking
 import org.jetbrains.kotlin.scripting.compiler.plugin.impl.CompiledScriptClassLoader
-import org.jetbrains.kotlin.scripting.compiler.plugin.impl.KJvmCompiledModuleInMemory
+import org.jetbrains.kotlin.scripting.compiler.plugin.impl.KJvmCompiledModuleInMemoryImpl
 import org.jetbrains.org.objectweb.asm.ClassReader
 import org.jetbrains.org.objectweb.asm.ClassVisitor
 import org.jetbrains.org.objectweb.asm.Opcodes
@@ -348,7 +348,7 @@ class ScriptingHostTest : TestCase() {
         assertTrue(compiledScript is ResultWithDiagnostics.Success)
 
         val jvmCompiledScript = compiledScript.valueOrNull()!! as KJvmCompiledScript
-        val jvmCompiledModule = jvmCompiledScript.compiledModule as KJvmCompiledModuleInMemory
+        val jvmCompiledModule = jvmCompiledScript.compiledModule as KJvmCompiledModuleInMemoryImpl
         val bytes = jvmCompiledModule.compilerOutputFiles["SavedScript.class"]!!
 
         var classFileVersion: Int? = null
@@ -377,9 +377,9 @@ class ScriptingHostTest : TestCase() {
         val compiler = JvmScriptCompiler(defaultJvmScriptingHostConfiguration)
         val compiledScript = runBlocking {
             val res = compiler(script.toScriptSource(), scriptCompilationConfiguration).throwOnFailure()
-            (res as ResultWithDiagnostics.Success<CompiledScript<*>>).value
+            (res as ResultWithDiagnostics.Success<CompiledScript>).value
         }
-        val compiledScriptClass = runBlocking { compiledScript.getClass(null).throwOnFailure().valueOrNull()!! as KClass<*> }
+        val compiledScriptClass = runBlocking { compiledScript.getClass(null).throwOnFailure().valueOrNull()!! }
         val classLoader = compiledScriptClass.java.classLoader
 
         Assert.assertTrue(classLoader is CompiledScriptClassLoader)
@@ -394,8 +394,8 @@ class ScriptingHostTest : TestCase() {
         Assert.assertNotNull(classAsResourceUrl)
         Assert.assertNotNull(classAssResourceStream)
 
-        val classAsResourceData = classAsResourceUrl.openConnection().getInputStream().readBytes()
-        val classAsResourceStreamData = classAssResourceStream.readBytes()
+        val classAsResourceData = classAsResourceUrl!!.openConnection().getInputStream().readBytes()
+        val classAsResourceStreamData = classAssResourceStream!!.readBytes()
 
         Assert.assertArrayEquals(classAsResourceData, classAsResourceStreamData)
 

@@ -1,6 +1,3 @@
-// IGNORE_BACKEND: JVM_IR
-// In JVM_IR $i$f variables occupy different slots
-
 interface ApplicationCall
 
 interface AuthenticationService {

@@ -49,6 +49,7 @@ import com.intellij.ui.components.JBList
 import com.intellij.usageView.UsageViewTypeLocation
 import com.intellij.util.VisibilityUtil
 import com.intellij.util.containers.MultiMap
+import org.jetbrains.annotations.Nls
 import org.jetbrains.kotlin.asJava.LightClassUtil
 import org.jetbrains.kotlin.asJava.elements.KtLightMethod
 import org.jetbrains.kotlin.asJava.getAccessorLightMethods
@@ -375,10 +376,10 @@ fun <T> chooseContainerElement(
             private fun PsiElement.renderDeclaration(): String? {
                 if (this is KtFunctionLiteral || isFunctionalExpression()) return renderText()
 
-                val descriptor = when {
-                    this is KtFile -> name
-                    this is KtElement -> analyze()[BindingContext.DECLARATION_TO_DESCRIPTOR, this]
-                    this is PsiMember -> getJavaMemberDescriptor()
+                val descriptor = when (this) {
+                    is KtFile -> name
+                    is KtElement -> analyze()[BindingContext.DECLARATION_TO_DESCRIPTOR, this]
+                    is PsiMember -> getJavaMemberDescriptor()
                     else -> null
                 } ?: return null
                 val name = renderName()
@@ -391,7 +392,7 @@ fun <T> chooseContainerElement(
             }
 
             private fun PsiElement.renderText(): String = when (this) {
-                is SeparateFileWrapper -> "Extract to separate file"
+                is SeparateFileWrapper -> KotlinBundle.message("refactoring.extract.to.separate.file.text")
                 is PsiPackageBase -> qualifiedName
                 else -> {
                     val text = text ?: "<invalid text>"
@@ -853,7 +854,7 @@ val PsiElement.isInsideInjectedFragment: Boolean
 fun checkSuperMethods(
     declaration: KtDeclaration,
     ignore: Collection<PsiElement>?,
-    actionString: String
+    @Nls actionString: String
 ): List<PsiElement> {
     fun getClassDescriptions(overriddenElementsToDescriptor: Map<PsiElement, CallableDescriptor>): List<String> {
         return overriddenElementsToDescriptor.entries.map { entry ->
@@ -877,7 +878,7 @@ fun checkSuperMethods(
         val superClassDescriptions = getClassDescriptions(overriddenElementsToDescriptor)
 
         val message = KotlinBundle.message(
-            "x.overrides.y.in.class.list",
+            "override.declaration.x.overrides.y.in.class.list",
             DescriptorRenderer.COMPACT_WITH_SHORT_TYPES.render(declarationDescriptor),
             "\n${superClassDescriptions.joinToString(separator = "")}",
             actionString

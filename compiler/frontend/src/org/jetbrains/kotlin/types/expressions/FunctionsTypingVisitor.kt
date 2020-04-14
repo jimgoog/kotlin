@@ -163,7 +163,7 @@ internal class FunctionsTypingVisitor(facade: ExpressionTypingInternals) : Expre
         )
 
         if (functionTypeExpected) {
-            components.dataFlowAnalyzer.checkType(resultType, expression, context)
+            components.dataFlowAnalyzer.checkType(resultType, expression, context.replaceExpectedType(resultType))
             return createTypeInfo(resultType, context)
         }
 

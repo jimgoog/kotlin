@@ -15,7 +15,6 @@ import org.jetbrains.kotlin.codegen.binding.CodegenBinding.CAPTURES_CROSSINLINE_
 import org.jetbrains.kotlin.codegen.binding.CodegenBinding.CLOSURE
 import org.jetbrains.kotlin.codegen.context.ClosureContext
 import org.jetbrains.kotlin.codegen.context.MethodContext
-import org.jetbrains.kotlin.codegen.inline.coroutines.SurroundSuspendLambdaCallsWithSuspendMarkersMethodVisitor
 import org.jetbrains.kotlin.codegen.serialization.JvmSerializationBindings.METHOD_FOR_FUNCTION
 import org.jetbrains.kotlin.codegen.serialization.JvmSerializerExtension
 import org.jetbrains.kotlin.codegen.state.GenerationState
@@ -307,10 +306,29 @@ class CoroutineCodegenForLambda private constructor(
         val createArgumentTypes =
             if (generateErasedCreate || doNotGenerateInvokeBridge) typeMapper.mapAsmMethod(createCoroutineDescriptor).argumentTypes.asList()
             else parameterTypes
-        var index = 0
-        parameterTypes.withVariableIndices().forEach { (varIndex, type) ->
-            load(varIndex + 1, type)
-            StackValue.coerce(type, createArgumentTypes[index++], this)
+        // invoke is not big arity, but create is. Pass an array to create.
+        if (parameterTypes.size == 22 && createArgumentTypes.size == 1) {
+            iconst(22)
+            newarray(AsmTypes.OBJECT_TYPE)
+            // 0 - this
+            // 1..22 - parameters
+            // 23 - first empy slot
+            val arraySlot = 23
+            store(arraySlot, AsmTypes.OBJECT_TYPE)
+            for ((varIndex, type) in parameterTypes.withVariableIndices()) {
+                load(arraySlot, AsmTypes.OBJECT_TYPE)
+                iconst(varIndex)
+                load(varIndex + 1, type)
+                StackValue.coerce(type, AsmTypes.OBJECT_TYPE, this)
+                astore(AsmTypes.OBJECT_TYPE)
+            }
+            load(arraySlot, AsmTypes.OBJECT_TYPE)
+        } else {
+            var index = 0
+            parameterTypes.withVariableIndices().forEach { (varIndex, type) ->
+                load(varIndex + 1, type)
+                StackValue.coerce(type, createArgumentTypes[index++], this)
+            }
         }
 
         // this.create(..)
@@ -482,17 +500,11 @@ class CoroutineCodegenForLambda private constructor(
                         languageVersionSettings = languageVersionSettings,
                         disableTailCallOptimizationForFunctionReturningUnit = false
                     )
-                    return if (forInline) AddEndLabelMethodVisitor(
-                        MethodNodeCopyingMethodVisitor(
-                            SurroundSuspendLambdaCallsWithSuspendMarkersMethodVisitor(
-                                stateMachineBuilder, access, name, desc, v.thisName,
-                                isCapturedSuspendLambda = { isCapturedSuspendLambda(closure, it.name, state.bindingContext) }
-                            ), access, name, desc,
-                            newMethod = { origin, newAccess, newName, newDesc ->
-                                functionCodegen.newMethod(origin, newAccess, newName, newDesc, null, null)
-                            }
-                        ), access, name, desc, endLabel
-                    ) else AddEndLabelMethodVisitor(stateMachineBuilder, access, name, desc, endLabel)
+                    val maybeWithForInline = if (forInline)
+                        SuspendForInlineCopyingMethodVisitor(stateMachineBuilder, access, name, desc, functionCodegen::newMethod)
+                    else
+                        stateMachineBuilder
+                    return AddEndLabelMethodVisitor(maybeWithForInline, access, name, desc, endLabel)
                 }
 
                 override fun doGenerateBody(codegen: ExpressionCodegen, signature: JvmMethodSignature) {

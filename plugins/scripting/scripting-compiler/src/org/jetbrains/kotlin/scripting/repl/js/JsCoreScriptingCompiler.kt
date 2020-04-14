@@ -5,6 +5,7 @@
 
 package org.jetbrains.kotlin.scripting.repl.js
 
+import org.jetbrains.kotlin.backend.common.serialization.signature.IdSignatureDescriptor
 import org.jetbrains.kotlin.cli.common.CLIConfigurationKeys
 import org.jetbrains.kotlin.cli.common.environment.setIdeaIoUseFallback
 import org.jetbrains.kotlin.cli.common.messages.AnalyzerWithCompilerReport
@@ -17,8 +18,7 @@ import org.jetbrains.kotlin.config.languageVersionSettings
 import org.jetbrains.kotlin.descriptors.ModuleDescriptor
 import org.jetbrains.kotlin.ir.backend.js.JsIrBackendContext
 import org.jetbrains.kotlin.ir.backend.js.generateJsCode
-import org.jetbrains.kotlin.ir.backend.js.generateModuleFragment
-import org.jetbrains.kotlin.ir.backend.js.lower.serialization.ir.JsMangler
+import org.jetbrains.kotlin.ir.backend.js.lower.serialization.ir.JsManglerDesc
 import org.jetbrains.kotlin.ir.backend.js.utils.NameTables
 import org.jetbrains.kotlin.ir.util.ExternalDependenciesGenerator
 import org.jetbrains.kotlin.ir.util.SymbolTable
@@ -57,13 +57,15 @@ class JsCoreScriptingCompiler(
             if (messageCollector.hasErrors()) return ReplCompileResult.Error("Error while analysis")
         }
 
+        val files = listOf(snippetKtFile)
         val module = analysisResult.moduleDescriptor
         val bindingContext = analysisResult.bindingContext
-
-        val psi2ir = Psi2IrTranslator(environment.configuration.languageVersionSettings, mangler = JsMangler)
+        val mangler = JsManglerDesc
+        val signaturer = IdSignatureDescriptor(mangler)
+        val psi2ir = Psi2IrTranslator(environment.configuration.languageVersionSettings, signaturer = signaturer)
         val psi2irContext = psi2ir.createGeneratorContext(module, bindingContext, symbolTable)
-
-        val irModuleFragment = psi2irContext.generateModuleFragment(listOf(snippetKtFile))
+        val providers = generateTypicalIrProviderList(module, psi2irContext.irBuiltIns, psi2irContext.symbolTable)
+        val irModuleFragment = psi2ir.generateModuleFragment(psi2irContext, files, providers, null) // TODO: deserializer
 
         val context = JsIrBackendContext(
             irModuleFragment.descriptor,
@@ -81,7 +83,8 @@ class JsCoreScriptingCompiler(
                 irModuleFragment.descriptor,
                 psi2irContext.irBuiltIns,
                 psi2irContext.symbolTable
-            )
+            ),
+            environment.configuration.languageVersionSettings
         ).generateUnboundSymbolsAsDependencies()
 
         environment.configuration.put(JSConfigurationKeys.MODULE_KIND, ModuleKind.PLAIN)

@@ -1,4 +1,3 @@
-// !WITH_NEW_INFERENCE
 // !LANGUAGE: -SafeCastCheckBoundSmartCasts -BooleanElvisBoundSmartCasts
 // A set of examples for
 // "If the result of a safe call is not null, understand that its receiver is not null"
@@ -52,7 +51,7 @@ fun kt4565_1(a: SomeClass?) {
         a.data.hashCode()
     }
     if (a?.data is String) {
-        a.<!INAPPLICABLE_CANDIDATE!>data<!>.<!UNRESOLVED_REFERENCE!>length<!>
+        a.data.length
         data.length
     }
 }
@@ -64,7 +63,7 @@ fun kt4565_2(a: SomeClass?) {
     }
     val extra = (a as? SubClass)?.extra
     if (extra != null) {
-        a.<!UNRESOLVED_REFERENCE!>extra<!>.<!UNRESOLVED_REFERENCE!>hashCode<!>()
+        a.extra.hashCode()
     }
 }
 

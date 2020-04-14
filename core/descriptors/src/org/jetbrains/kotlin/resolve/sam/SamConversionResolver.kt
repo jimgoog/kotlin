@@ -8,9 +8,12 @@ package org.jetbrains.kotlin.resolve.sam
 import org.jetbrains.kotlin.container.DefaultImplementation
 import org.jetbrains.kotlin.container.PlatformSpecificExtension
 import org.jetbrains.kotlin.descriptors.ClassDescriptor
+import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.types.SimpleType
 
-@DefaultImplementation(impl = SamConversionResolver.Empty::class)
+val SAM_LOOKUP_NAME = Name.special("<SAM-CONSTRUCTOR>")
+
+@DefaultImplementation(impl = SamConversionResolverImpl.SamConversionResolverWithoutReceiverConversion::class)
 interface SamConversionResolver : PlatformSpecificExtension<SamConversionResolver> {
     object Empty : SamConversionResolver {
         override fun resolveFunctionTypeIfSamInterface(classDescriptor: ClassDescriptor): SimpleType? = null

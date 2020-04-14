@@ -1,3 +1,4 @@
+
 open class SuperFoo {
     public fun bar(): String {
         if (this is Foo) {

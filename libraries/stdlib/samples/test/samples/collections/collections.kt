@@ -335,6 +335,18 @@ class Collections {
         }
 
         @Sample
+        fun setOfNotNull() {
+            val empty = setOfNotNull<Any>(null)
+            assertPrints(empty, "[]")
+
+            val singleton = setOfNotNull(42)
+            assertPrints(singleton, "[42]")
+
+            val set = setOfNotNull(1, null, 2, null, 3)
+            assertPrints(set, "[1, 2, 3]")
+        }
+
+        @Sample
         fun emptyLinkedHashSet() {
             val set: LinkedHashSet<Int> = linkedSetOf<Int>()
 
@@ -686,6 +698,7 @@ class Collections {
         fun reduceOrNull() {
             val strings = listOf("a", "b", "c", "d")
             assertPrints(strings.reduceOrNull { acc, string -> acc + string }, "abcd")
+            assertPrints(strings.reduceIndexedOrNull { index, acc, string -> acc + string + index }, "ab1c2d3")
 
             assertPrints(emptyList<String>().reduceOrNull { _, _ -> "" }, "null")
         }
@@ -694,8 +707,27 @@ class Collections {
         fun reduceRightOrNull() {
             val strings = listOf("a", "b", "c", "d")
             assertPrints(strings.reduceRightOrNull { string, acc -> acc + string }, "dcba")
+            assertPrints(strings.reduceRightIndexedOrNull { index, string, acc -> acc + string + index }, "dc2b1a0")
 
             assertPrints(emptyList<String>().reduceRightOrNull { _, _ -> "" }, "null")
+        }
+
+        @Sample
+        fun scan() {
+            val strings = listOf("a", "b", "c", "d")
+            assertPrints(strings.scan("s") { acc, string -> acc + string }, "[s, sa, sab, sabc, sabcd]")
+            assertPrints(strings.scanIndexed("s") { index, acc, string -> acc + string + index }, "[s, sa0, sa0b1, sa0b1c2, sa0b1c2d3]")
+
+            assertPrints(emptyList<String>().scan("s") { _, _ -> "X" }, "[s]")
+        }
+
+        @Sample
+        fun scanReduce() {
+            val strings = listOf("a", "b", "c", "d")
+            assertPrints(strings.scanReduce { acc, string -> acc + string }, "[a, ab, abc, abcd]")
+            assertPrints(strings.scanReduceIndexed { index, acc, string -> acc + string + index }, "[a, ab1, ab1c2, ab1c2d3]")
+
+            assertPrints(emptyList<String>().scanReduce { _, _ -> "X" }, "[]")
         }
     }
 
@@ -768,5 +800,26 @@ class Collections {
             assertPrints(people.joinToString(), "Sweyn Forkbeard, Ragnar Lodbrok, Bjorn Ironside")
         }
 
+    }
+
+    class Filtering {
+
+        @Sample
+        fun filter() {
+            val numbers: List<Int> = listOf(1, 2, 3, 4, 5, 6, 7)
+            val evenNumbers = numbers.filter { it % 2 == 0 }
+            val notMultiplesOf3 = numbers.filterNot { number -> number % 3 == 0 }
+
+            assertPrints(evenNumbers, "[2, 4, 6]")
+            assertPrints(notMultiplesOf3, "[1, 2, 4, 5, 7]")
+        }
+
+        @Sample
+        fun filterNotNull() {
+            val numbers: List<Int?> = listOf(1, 2, null, 4)
+            val nonNullNumbers = numbers.filterNotNull()
+
+            assertPrints(nonNullNumbers, "[1, 2, 4]")
+        }
     }
 }

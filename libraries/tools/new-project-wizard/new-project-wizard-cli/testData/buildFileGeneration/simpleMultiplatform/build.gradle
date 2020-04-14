@@ -1,17 +1,24 @@
 plugins {
-    id 'org.jetbrains.kotlin.multiplatform' version '1.3.61'
+    id 'org.jetbrains.kotlin.multiplatform' version 'KOTLIN_VERSION'
 }
 group = 'testGroupId'
 version = '1.0-SNAPSHOT'
 
 repositories {
     mavenCentral()
+    maven {
+        url 'https://dl.bintray.com/kotlin/kotlin-dev'
+    }
 }
 kotlin {
-    jvm()
+    jvm {
+        compilations.all {
+            kotlinOptions.jvmTarget = '9'
+        }
+    }
     js('a') {
         browser {
-
+            binaries.executable()
         }
     }
     sourceSets {
@@ -21,7 +28,9 @@ kotlin {
             }
         }
         jvmTest {
-
+            dependencies {
+                implementation kotlin('test-junit')
+            }
         }
         aMain {
             dependencies {
@@ -29,7 +38,9 @@ kotlin {
             }
         }
         aTest {
-
+            dependencies {
+                implementation kotlin('test-js')
+            }
         }
     }
 }

@@ -6,17 +6,23 @@
 package org.jetbrains.kotlin.idea.scripting.gradle
 
 import com.intellij.openapi.components.service
+import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiFile
 import org.jetbrains.kotlin.idea.core.script.ScriptConfigurationManager
 import org.jetbrains.kotlin.idea.script.AbstractScriptConfigurationLoadingTest
 import org.jetbrains.kotlin.psi.KtFile
+import org.jetbrains.kotlin.test.JUnit3WithIdeaConfigurationRunner
 import org.jetbrains.plugins.gradle.util.GradleConstants
+import org.junit.runner.RunWith
 import java.io.File
 
-private const val outsidePlaceholder = "// OUTSIDE_SECTIONS"
-private const val insidePlaceholder = "// INSIDE_SECTIONS"
+@RunWith(JUnit3WithIdeaConfigurationRunner::class)
+open class GradleScriptInputsWatcherTest : AbstractScriptConfigurationLoadingTest() {
+    companion object {
+        internal const val outsidePlaceholder = "// OUTSIDE_SECTIONS"
+        internal const val insidePlaceholder = "// INSIDE_SECTIONS"
+    }
 
-class GradleScriptInputsWatcherTest : AbstractScriptConfigurationLoadingTest() {
     private lateinit var testFiles: TestFiles
 
     data class TestFiles(val buildKts: KtFile, val settings: KtFile, val prop: PsiFile)
@@ -192,8 +198,8 @@ class GradleScriptInputsWatcherTest : AbstractScriptConfigurationLoadingTest() {
         changeSettingsKtsOutsideSections()
 
         val ts = System.currentTimeMillis()
-        project.service<GradleScriptInputsWatcher>().fileChanged(testFiles.buildKts.virtualFile, ts)
-        project.service<GradleScriptInputsWatcher>().fileChanged(testFiles.settings.virtualFile, ts)
+        markFileChanged(testFiles.buildKts.virtualFile, ts)
+        markFileChanged(testFiles.settings.virtualFile, ts)
 
         assertConfigurationUpdateWasDone(testFiles.settings)
         assertConfigurationUpdateWasDone(testFiles.buildKts)
@@ -204,13 +210,17 @@ class GradleScriptInputsWatcherTest : AbstractScriptConfigurationLoadingTest() {
         assertAndLoadInitialConfiguration(testFiles.settings)
 
         val ts = System.currentTimeMillis()
-        project.service<GradleScriptInputsWatcher>().fileChanged(testFiles.buildKts.virtualFile, ts)
-        project.service<GradleScriptInputsWatcher>().fileChanged(testFiles.settings.virtualFile, ts)
+        markFileChanged(testFiles.buildKts.virtualFile, ts)
+        markFileChanged(testFiles.settings.virtualFile, ts)
 
         changePropertiesFile()
 
         assertConfigurationUpdateWasDone(testFiles.settings)
         assertConfigurationUpdateWasDone(testFiles.buildKts)
+    }
+
+    private fun markFileChanged(virtualFile: VirtualFile, ts: Long) {
+        project.service<GradleScriptInputsWatcher>().fileChanged(virtualFile.path, ts)
     }
 
     fun testLoadedConfigurationWhenExternalFileChanged() {

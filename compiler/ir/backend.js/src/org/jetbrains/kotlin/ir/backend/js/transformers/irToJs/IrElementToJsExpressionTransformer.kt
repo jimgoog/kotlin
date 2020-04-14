@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2020 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -10,6 +10,8 @@ import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.ir.backend.js.utils.*
 import org.jetbrains.kotlin.ir.declarations.IrClass
 import org.jetbrains.kotlin.ir.declarations.IrConstructor
+import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
+import org.jetbrains.kotlin.ir.declarations.IrValueDeclaration
 import org.jetbrains.kotlin.ir.expressions.*
 import org.jetbrains.kotlin.ir.types.isUnit
 import org.jetbrains.kotlin.ir.util.*
@@ -26,8 +28,8 @@ class IrElementToJsExpressionTransformer : BaseIrElementToJsNodeTransformer<JsEx
     override fun visitExpressionBody(body: IrExpressionBody, context: JsGenerationContext): JsExpression =
         body.expression.accept(this, context)
 
-    override fun visitFunctionReference(expression: IrFunctionReference, context: JsGenerationContext): JsExpression {
-        val irFunction = expression.symbol.owner
+    override fun visitFunctionExpression(expression: IrFunctionExpression, context: JsGenerationContext): JsExpression {
+        val irFunction = expression.function
         return irFunction.accept(IrFunctionToJsTransformer(), context).apply { name = null }
     }
 
@@ -84,13 +86,23 @@ class IrElementToJsExpressionTransformer : BaseIrElementToJsNodeTransformer<JsEx
         return JsNameRef(fieldName, expression.receiver?.accept(this, context))
     }
 
-    override fun visitGetValue(expression: IrGetValue, context: JsGenerationContext): JsExpression =
-        context.getNameForValueDeclaration(expression.symbol.owner).makeRef()
+    override fun visitGetValue(expression: IrGetValue, context: JsGenerationContext): JsExpression {
+        if (expression.symbol.owner.isThisReceiver()) return JsThisRef()
+        return context.getNameForValueDeclaration(expression.symbol.owner).makeRef()
+    }
 
     override fun visitGetObjectValue(expression: IrGetObjectValue, context: JsGenerationContext): JsExpression {
         val obj = expression.symbol.owner
         assert(obj.kind == ClassKind.OBJECT)
         assert(obj.isEffectivelyExternal()) { "Non external IrGetObjectValue must be lowered" }
+
+        // External interfaces cannot normally have companion objects.
+        // However, stdlib uses them to simulate string literal unions
+        // TODO: Stop abusing this tech
+        if (obj.isCompanion && obj.parentAsClass.isInterface) {
+            return JsNullLiteral()
+        }
+
         return context.getRefForExternalClass(obj)
     }
 
@@ -269,4 +281,10 @@ class IrElementToJsExpressionTransformer : BaseIrElementToJsNodeTransformer<JsEx
             expression.left.accept(this, data),
             expression.right.accept(this, data)
         )
+
+    private fun IrValueDeclaration.isThisReceiver(): Boolean = when (val p = parent) {
+        is IrSimpleFunction -> this === p.dispatchReceiverParameter
+        is IrClass -> this === p.thisReceiver
+        else -> false
+    }
 }

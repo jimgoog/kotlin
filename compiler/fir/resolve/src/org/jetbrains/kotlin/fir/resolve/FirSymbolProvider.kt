@@ -8,8 +8,8 @@ package org.jetbrains.kotlin.fir.resolve
 import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.FirSessionComponent
 import org.jetbrains.kotlin.fir.scopes.FirScope
-import org.jetbrains.kotlin.fir.scopes.ProcessorAction
 import org.jetbrains.kotlin.fir.scopes.impl.declaredMemberScope
+import org.jetbrains.kotlin.fir.scopes.impl.nestedClassifierScope
 import org.jetbrains.kotlin.fir.symbols.ConeClassLikeLookupTag
 import org.jetbrains.kotlin.fir.symbols.ConeClassifierLookupTag
 import org.jetbrains.kotlin.fir.symbols.ConeClassifierLookupTagWithFixedSymbol
@@ -60,17 +60,18 @@ abstract class FirSymbolProvider : FirSessionComponent {
     }
 }
 
+fun FirSession.getNestedClassifierScope(lookupTag: ConeClassLikeLookupTag): FirScope? =
+    when (lookupTag) {
+        is ConeClassLookupTagWithFixedSymbol -> nestedClassifierScope(lookupTag.symbol.fir)
+        else -> firSymbolProvider.getNestedClassifierScope(lookupTag.classId)
+    }
+
 fun FirSymbolProvider.getClassDeclaredCallableSymbols(classId: ClassId, name: Name): List<FirCallableSymbol<*>> {
     val classSymbol = getClassLikeSymbolByFqName(classId) as? FirRegularClassSymbol ?: return emptyList()
     val declaredMemberScope = declaredMemberScope(classSymbol.fir)
     val result = mutableListOf<FirCallableSymbol<*>>()
-    val processor: (FirCallableSymbol<*>) -> ProcessorAction = {
-        result.add(it)
-        ProcessorAction.NEXT
-    }
-
-    declaredMemberScope.processFunctionsByName(name, processor)
-    declaredMemberScope.processPropertiesByName(name, processor)
+    declaredMemberScope.processFunctionsByName(name, result::add)
+    declaredMemberScope.processPropertiesByName(name, result::add)
 
     return result
 }

@@ -24,6 +24,11 @@ public class SlicerNullnessGroupingTestGenerated extends AbstractSlicerNullnessG
         KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
     }
 
+    @TestMetadata("abstractFun.kt")
+    public void testAbstractFun() throws Exception {
+        runTest("idea/testData/slicer/inflow/abstractFun.kt");
+    }
+
     public void testAllFilesPresentInInflow() throws Exception {
         KotlinTestUtils.assertAllTestsPresentInSingleGeneratedClassWithExcluded(this.getClass(), new File("idea/testData/slicer/inflow"), Pattern.compile("^(.+)\\.kt$"), null);
     }
@@ -223,6 +228,26 @@ public class SlicerNullnessGroupingTestGenerated extends AbstractSlicerNullnessG
         runTest("idea/testData/slicer/inflow/nullsAndNotNulls.kt");
     }
 
+    @TestMetadata("openFun.kt")
+    public void testOpenFun() throws Exception {
+        runTest("idea/testData/slicer/inflow/openFun.kt");
+    }
+
+    @TestMetadata("openFunInvokeOnParameter.kt")
+    public void testOpenFunInvokeOnParameter() throws Exception {
+        runTest("idea/testData/slicer/inflow/openFunInvokeOnParameter.kt");
+    }
+
+    @TestMetadata("overrideFun.kt")
+    public void testOverrideFun() throws Exception {
+        runTest("idea/testData/slicer/inflow/overrideFun.kt");
+    }
+
+    @TestMetadata("overrideProperty.kt")
+    public void testOverrideProperty() throws Exception {
+        runTest("idea/testData/slicer/inflow/overrideProperty.kt");
+    }
+
     @TestMetadata("overridingFunctionResult.kt")
     public void testOverridingFunctionResult() throws Exception {
         runTest("idea/testData/slicer/inflow/overridingFunctionResult.kt");
@@ -251,6 +276,11 @@ public class SlicerNullnessGroupingTestGenerated extends AbstractSlicerNullnessG
     @TestMetadata("primaryConstructorParameterWithDefault.kt")
     public void testPrimaryConstructorParameterWithDefault() throws Exception {
         runTest("idea/testData/slicer/inflow/primaryConstructorParameterWithDefault.kt");
+    }
+
+    @TestMetadata("propertyInInterface.kt")
+    public void testPropertyInInterface() throws Exception {
+        runTest("idea/testData/slicer/inflow/propertyInInterface.kt");
     }
 
     @TestMetadata("qualifiedAssignmentsForQualifiedRef.kt")

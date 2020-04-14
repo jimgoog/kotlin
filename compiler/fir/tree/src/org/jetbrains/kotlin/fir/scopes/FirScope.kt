@@ -5,28 +5,32 @@
 
 package org.jetbrains.kotlin.fir.scopes
 
-import org.jetbrains.kotlin.fir.scopes.ProcessorAction.NEXT
-import org.jetbrains.kotlin.fir.symbols.impl.FirCallableSymbol
+import org.jetbrains.kotlin.fir.resolve.substitution.ConeSubstitutor
 import org.jetbrains.kotlin.fir.symbols.impl.FirClassifierSymbol
+import org.jetbrains.kotlin.fir.symbols.impl.FirConstructorSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirFunctionSymbol
+import org.jetbrains.kotlin.fir.symbols.impl.FirVariableSymbol
 import org.jetbrains.kotlin.name.Name
 
 abstract class FirScope {
-    open fun processClassifiersByName(
+    open fun processClassifiersByNameWithSubstitution(
         name: Name,
-        processor: (FirClassifierSymbol<*>) -> ProcessorAction
-    ): ProcessorAction = NEXT
+        processor: (FirClassifierSymbol<*>, ConeSubstitutor) -> Unit
+    ) {}
 
     open fun processFunctionsByName(
         name: Name,
-        processor: (FirFunctionSymbol<*>) -> ProcessorAction
-    ): ProcessorAction = NEXT
+        processor: (FirFunctionSymbol<*>) -> Unit
+    ) {}
 
     open fun processPropertiesByName(
         name: Name,
-        // NB: it'd be great to write FirVariableSymbol<*> here, but there is FirAccessorSymbol :(
-        processor: (FirCallableSymbol<*>) -> ProcessorAction
-    ): ProcessorAction = NEXT
+        processor: (FirVariableSymbol<*>) -> Unit
+    ) {}
+
+    open fun processDeclaredConstructors(
+        processor: (FirConstructorSymbol) -> Unit
+    ) {}
 }
 
 enum class ProcessorAction {
@@ -44,4 +48,17 @@ enum class ProcessorAction {
 
     fun stop() = this == STOP
     fun next() = this != STOP
+
+    operator fun plus(other: ProcessorAction): ProcessorAction {
+        if (this == NEXT || other == NEXT) return NEXT
+        return this
+    }
+}
+
+
+inline fun FirScope.processClassifiersByName(
+    name: Name,
+    noinline processor: (FirClassifierSymbol<*>) -> Unit
+) {
+    processClassifiersByNameWithSubstitution(name) { symbol, _ -> processor(symbol) }
 }

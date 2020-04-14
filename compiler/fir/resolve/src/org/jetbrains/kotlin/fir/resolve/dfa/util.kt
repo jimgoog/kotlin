@@ -5,17 +5,26 @@
 
 package org.jetbrains.kotlin.fir.resolve.dfa
 
+import kotlinx.collections.immutable.PersistentMap
+import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.fir.FirElement
+import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.FirSymbolOwner
 import org.jetbrains.kotlin.fir.contracts.description.ConeBooleanConstantReference
 import org.jetbrains.kotlin.fir.contracts.description.ConeConstantReference
+import org.jetbrains.kotlin.fir.declarations.*
+import org.jetbrains.kotlin.fir.declarations.impl.FirDefaultPropertyAccessor
 import org.jetbrains.kotlin.fir.expressions.*
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference
-import org.jetbrains.kotlin.fir.references.impl.FirExplicitThisReference
+import org.jetbrains.kotlin.fir.references.FirThisReference
 import org.jetbrains.kotlin.fir.resolve.calls.FirNamedReferenceWithCandidate
+import org.jetbrains.kotlin.fir.resolve.directExpansionType
+import org.jetbrains.kotlin.fir.resolve.fullyExpandedType
+import org.jetbrains.kotlin.fir.resolve.toSymbol
 import org.jetbrains.kotlin.fir.symbols.AbstractFirBasedSymbol
-import org.jetbrains.kotlin.fir.symbols.impl.FirFunctionSymbol
-import org.jetbrains.kotlin.fir.symbols.impl.FirNamedFunctionSymbol
+import org.jetbrains.kotlin.fir.symbols.impl.*
+import org.jetbrains.kotlin.fir.types.ConeClassLikeType
+import org.jetbrains.kotlin.fir.types.ConeFlexibleType
 import org.jetbrains.kotlin.fir.types.ConeKotlinType
 import org.jetbrains.kotlin.fir.types.coneTypeSafe
 import org.jetbrains.kotlin.utils.addToStdlib.safeAs
@@ -23,7 +32,7 @@ import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.InvocationKind
 import kotlin.contracts.contract
 
-@UseExperimental(ExperimentalContracts::class)
+@OptIn(ExperimentalContracts::class)
 fun DataFlowVariable.isSynthetic(): Boolean {
     contract {
         returns(true) implies (this@isSynthetic is SyntheticVariable)
@@ -32,7 +41,7 @@ fun DataFlowVariable.isSynthetic(): Boolean {
     return this is SyntheticVariable
 }
 
-@UseExperimental(ExperimentalContracts::class)
+@OptIn(ExperimentalContracts::class)
 fun DataFlowVariable.isReal(): Boolean {
     contract {
         returns(true) implies (this@isReal is RealVariable)
@@ -53,7 +62,7 @@ fun MutableTypeStatements.mergeTypeStatements(other: TypeStatements) {
     }
 }
 
-@UseExperimental(ExperimentalContracts::class)
+@OptIn(ExperimentalContracts::class)
 internal inline fun <K, V> MutableMap<K, V>.put(key: K, value: V, remappingFunction: (existing: V) -> V) {
     contract {
         callsInPlace(remappingFunction, InvocationKind.AT_MOST_ONCE)
@@ -61,6 +70,20 @@ internal inline fun <K, V> MutableMap<K, V>.put(key: K, value: V, remappingFunct
     val existing = this[key]
     if (existing == null) {
         put(key, value)
+    } else {
+        put(key, remappingFunction(existing))
+    }
+}
+
+@OptIn(ExperimentalContracts::class)
+internal inline fun <K, V> PersistentMap<K, V>.put(key: K, valueProducer: () -> V, remappingFunction: (existing: V) -> V): PersistentMap<K, V> {
+    contract {
+        callsInPlace(remappingFunction, InvocationKind.AT_MOST_ONCE)
+        callsInPlace(valueProducer, InvocationKind.AT_MOST_ONCE)
+    }
+    val existing = this[key]
+    return if (existing == null) {
+        put(key, valueProducer())
     } else {
         put(key, remappingFunction(existing))
     }
@@ -108,13 +131,18 @@ internal val FirElement.symbol: AbstractFirBasedSymbol<*>?
         is FirSymbolOwner<*> -> symbol
         is FirWhenSubjectExpression -> whenSubject.whenExpression.subject?.symbol
         else -> null
-    }?.takeIf { this is FirThisReceiverExpression || it !is FirFunctionSymbol<*> }
+    }?.takeIf { this is FirThisReceiverExpression || (it !is FirFunctionSymbol<*> && it !is FirAccessorSymbol) }
 
 @DfaInternals
 internal val FirResolvable.symbol: AbstractFirBasedSymbol<*>?
     get() = when (val reference = calleeReference) {
-        is FirExplicitThisReference -> reference.boundSymbol
+        is FirThisReference -> reference.boundSymbol
         is FirResolvedNamedReference -> reference.resolvedSymbol
         is FirNamedReferenceWithCandidate -> reference.candidateSymbol
         else -> null
     }
+
+//val ConeKotlinType.isNothingOrNullableNothing: Boolean = when (this) {
+//    is ConeFlexibleType -> lowerBound.isNothingOrNullableNothing
+//    else -> false
+//}

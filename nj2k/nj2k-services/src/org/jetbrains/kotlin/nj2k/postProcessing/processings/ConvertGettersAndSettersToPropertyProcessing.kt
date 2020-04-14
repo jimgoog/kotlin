@@ -55,6 +55,11 @@ import org.jetbrains.kotlin.utils.addToStdlib.safeAs
 import org.jetbrains.kotlin.utils.mapToIndex
 
 class ConvertGettersAndSettersToPropertyProcessing : ElementsBasedPostProcessing() {
+    override val options: PostProcessingOptions =
+        PostProcessingOptions(
+            disablePostprocessingFormatting = false // without it comment saver will make the file invalid :(
+        )
+
     override fun runProcessing(elements: List<PsiElement>, converterContext: NewJ2kConverterContext) {
         val ktElements = elements.filterIsInstance<KtElement>()
         val resolutionFacade = runReadAction {
@@ -194,8 +199,9 @@ private class ConvertGettersAndSettersToPropertyStatefulProcessing(
 
     private fun KtParameter.rename(newName: String) {
         val renamer = RenamePsiElementProcessor.forElement(this)
+        val findReferences = findReferences(renamer)
         val usageInfos =
-            renamer.findReferences(this, false).mapNotNull { reference ->
+            findReferences.mapNotNull { reference ->
                 val element = reference.element
                 val isBackingField = element is KtNameReferenceExpression &&
                         element.text == KtTokens.FIELD_KEYWORD.value
@@ -233,6 +239,7 @@ private class ConvertGettersAndSettersToPropertyStatefulProcessing(
             modifiers
         )
         ktSetter.filterModifiers()
+        val propertyName = property.name
         if (setter is RealSetter) {
             setter.function.forAllUsages { usage ->
                 val callExpression = usage.getStrictParentOfType<KtCallExpression>() ?: return@forAllUsages
@@ -240,10 +247,10 @@ private class ConvertGettersAndSettersToPropertyStatefulProcessing(
                 val newValue = callExpression.valueArguments.single()
                 if (qualifier != null) {
                     qualifier.replace(
-                        factory.createExpression("${qualifier.receiverExpression.text}.${setter.name} = ${newValue.text}")
+                        factory.createExpression("${qualifier.receiverExpression.text}.$propertyName = ${newValue.text}")
                     )
                 } else {
-                    callExpression.replace(factory.createExpression("${setter.name} = ${newValue.text}"))
+                    callExpression.replace(factory.createExpression("$propertyName = ${newValue.text}"))
                 }
             }
         }
@@ -258,10 +265,11 @@ private class ConvertGettersAndSettersToPropertyStatefulProcessing(
 
     private fun KtExpression.isReferenceToThis() =
         when (this) {
-            is KtThisExpression -> instanceReference.resolve() == getStrictParentOfType<KtClassOrObject>()
-            is KtReferenceExpression -> resolve() == getStrictParentOfType<KtClassOrObject>()
-            else -> false
-        }
+            is KtThisExpression -> instanceReference
+            is KtReferenceExpression -> this
+            is KtQualifiedExpression -> selectorExpression as? KtReferenceExpression
+            else -> null
+        }?.resolve() == getStrictParentOfType<KtClassOrObject>()
 
     private fun KtElement.usages(scope: PsiElement? = null) =
         searcher.search(this, scope)

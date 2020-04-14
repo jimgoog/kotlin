@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2020 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -16,6 +16,7 @@ import com.intellij.psi.JavaDirectoryService
 import com.intellij.refactoring.rename.PsiElementRenameHandler
 import org.jetbrains.kotlin.descriptors.Visibilities
 import org.jetbrains.kotlin.descriptors.Visibility
+import org.jetbrains.kotlin.idea.KotlinBundle
 import org.jetbrains.kotlin.idea.core.KotlinNameSuggester
 import org.jetbrains.kotlin.idea.core.ShortenReferences
 import org.jetbrains.kotlin.idea.core.overrideImplement.ImplementMembersHandler
@@ -30,7 +31,10 @@ import org.jetbrains.kotlin.resolve.ModifiersChecker
 
 private const val IMPL_SUFFIX = "Impl"
 
-class CreateKotlinSubClassIntention : SelfTargetingRangeIntention<KtClass>(KtClass::class.java, "Create Kotlin subclass") {
+class CreateKotlinSubClassIntention : SelfTargetingRangeIntention<KtClass>(
+    KtClass::class.java,
+    KotlinBundle.lazyMessage("create.kotlin.subclass")
+) {
 
     override fun applicabilityRange(element: KtClass): TextRange? {
         if (element.name == null || element.getParentOfType<KtFunction>(true) != null) {
@@ -43,7 +47,7 @@ class CreateKotlinSubClassIntention : SelfTargetingRangeIntention<KtClass>(KtCla
         val primaryConstructor = element.primaryConstructor
         if (!element.isInterface() && primaryConstructor != null) {
             val constructors = element.secondaryConstructors + primaryConstructor
-            if (constructors.none() {
+            if (constructors.none {
                     !it.isPrivate() &&
                             it.getValueParameters().all { it.hasDefaultValue() }
                 }) {
@@ -52,17 +56,17 @@ class CreateKotlinSubClassIntention : SelfTargetingRangeIntention<KtClass>(KtCla
                 return null
             }
         }
-        text = getImplementTitle(element)
-        return TextRange(element.startOffset, element.getBody()?.lBrace?.startOffset ?: element.endOffset)
+
+        setTextGetter(getImplementTitle(element))
+        return TextRange(element.startOffset, element.body?.lBrace?.startOffset ?: element.endOffset)
     }
 
-    private fun getImplementTitle(baseClass: KtClass) =
-        when {
-            baseClass.isInterface() -> "Implement interface"
-            baseClass.isAbstract() -> "Implement abstract class"
-            baseClass.isSealed() -> "Implement sealed class"
-            else /* open class */ -> "Create subclass"
-        }
+    private fun getImplementTitle(baseClass: KtClass) = when {
+        baseClass.isInterface() -> KotlinBundle.lazyMessage("implement.interface")
+        baseClass.isAbstract() -> KotlinBundle.lazyMessage("implement.abstract.class")
+        baseClass.isSealed() -> KotlinBundle.lazyMessage("implement.sealed.class")
+        else /* open class */ -> KotlinBundle.lazyMessage("create.subclass")
+    }
 
     override fun startInWriteAction() = false
 
