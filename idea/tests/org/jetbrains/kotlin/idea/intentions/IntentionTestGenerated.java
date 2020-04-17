@@ -1130,6 +1130,59 @@ public class IntentionTestGenerated extends AbstractIntentionTest {
         }
     }
 
+    @TestMetadata("idea/testData/intentions/addMissingClassKeyword")
+    @TestDataPath("$PROJECT_ROOT")
+    @RunWith(JUnit3RunnerWithInners.class)
+    public static class AddMissingClassKeyword extends AbstractIntentionTest {
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("abstract.kt")
+        public void testAbstract() throws Exception {
+            runTest("idea/testData/intentions/addMissingClassKeyword/abstract.kt");
+        }
+
+        public void testAllFilesPresentInAddMissingClassKeyword() throws Exception {
+            KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("idea/testData/intentions/addMissingClassKeyword"), Pattern.compile("^([\\w\\-_]+)\\.(kt|kts)$"), true);
+        }
+
+        @TestMetadata("annottion.kt")
+        public void testAnnottion() throws Exception {
+            runTest("idea/testData/intentions/addMissingClassKeyword/annottion.kt");
+        }
+
+        @TestMetadata("data.kt")
+        public void testData() throws Exception {
+            runTest("idea/testData/intentions/addMissingClassKeyword/data.kt");
+        }
+
+        @TestMetadata("dataHasClassKeyword.kt")
+        public void testDataHasClassKeyword() throws Exception {
+            runTest("idea/testData/intentions/addMissingClassKeyword/dataHasClassKeyword.kt");
+        }
+
+        @TestMetadata("enum.kt")
+        public void testEnum() throws Exception {
+            runTest("idea/testData/intentions/addMissingClassKeyword/enum.kt");
+        }
+
+        @TestMetadata("enumHasClassKeyword.kt")
+        public void testEnumHasClassKeyword() throws Exception {
+            runTest("idea/testData/intentions/addMissingClassKeyword/enumHasClassKeyword.kt");
+        }
+
+        @TestMetadata("inner.kt")
+        public void testInner() throws Exception {
+            runTest("idea/testData/intentions/addMissingClassKeyword/inner.kt");
+        }
+
+        @TestMetadata("sealed.kt")
+        public void testSealed() throws Exception {
+            runTest("idea/testData/intentions/addMissingClassKeyword/sealed.kt");
+        }
+    }
+
     @TestMetadata("idea/testData/intentions/addMissingDestructuring")
     @TestDataPath("$PROJECT_ROOT")
     @RunWith(JUnit3RunnerWithInners.class)
@@ -2600,6 +2653,11 @@ public class IntentionTestGenerated extends AbstractIntentionTest {
                     runTest("idea/testData/intentions/branched/ifWhen/whenToIf/whenWithoutElse.kt");
                 }
 
+                @TestMetadata("whenWithoutElseUsedAsExpression.kt")
+                public void testWhenWithoutElseUsedAsExpression() throws Exception {
+                    runTest("idea/testData/intentions/branched/ifWhen/whenToIf/whenWithoutElseUsedAsExpression.kt");
+                }
+
                 @TestMetadata("whenWithoutSubject.kt")
                 public void testWhenWithoutSubject() throws Exception {
                     runTest("idea/testData/intentions/branched/ifWhen/whenToIf/whenWithoutSubject.kt");
@@ -3910,6 +3968,21 @@ public class IntentionTestGenerated extends AbstractIntentionTest {
                 KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("idea/testData/intentions/conventionNameCalls/replaceInvoke"), Pattern.compile("^([\\w\\-_]+)\\.(kt|kts)$"), null, true);
             }
 
+            @TestMetadata("dotQualifiedReceiver.kt")
+            public void testDotQualifiedReceiver() throws Exception {
+                runTest("idea/testData/intentions/conventionNameCalls/replaceInvoke/dotQualifiedReceiver.kt");
+            }
+
+            @TestMetadata("dotQualifiedReceiver2.kt")
+            public void testDotQualifiedReceiver2() throws Exception {
+                runTest("idea/testData/intentions/conventionNameCalls/replaceInvoke/dotQualifiedReceiver2.kt");
+            }
+
+            @TestMetadata("dotQualifiedReceiver3.kt")
+            public void testDotQualifiedReceiver3() throws Exception {
+                runTest("idea/testData/intentions/conventionNameCalls/replaceInvoke/dotQualifiedReceiver3.kt");
+            }
+
             @TestMetadata("expressionReceiver.kt")
             public void testExpressionReceiver() throws Exception {
                 runTest("idea/testData/intentions/conventionNameCalls/replaceInvoke/expressionReceiver.kt");
@@ -3930,6 +4003,11 @@ public class IntentionTestGenerated extends AbstractIntentionTest {
                 runTest("idea/testData/intentions/conventionNameCalls/replaceInvoke/invokeInExpression.kt");
             }
 
+            @TestMetadata("java.kt")
+            public void testJava() throws Exception {
+                runTest("idea/testData/intentions/conventionNameCalls/replaceInvoke/java.kt");
+            }
+
             @TestMetadata("namedArgumentInvoke.kt")
             public void testNamedArgumentInvoke() throws Exception {
                 runTest("idea/testData/intentions/conventionNameCalls/replaceInvoke/namedArgumentInvoke.kt");
@@ -3938,6 +4016,11 @@ public class IntentionTestGenerated extends AbstractIntentionTest {
             @TestMetadata("noArgumentInvoke.kt")
             public void testNoArgumentInvoke() throws Exception {
                 runTest("idea/testData/intentions/conventionNameCalls/replaceInvoke/noArgumentInvoke.kt");
+            }
+
+            @TestMetadata("notOperator.kt")
+            public void testNotOperator() throws Exception {
+                runTest("idea/testData/intentions/conventionNameCalls/replaceInvoke/notOperator.kt");
             }
 
             @TestMetadata("typeAndValueArgument.kt")

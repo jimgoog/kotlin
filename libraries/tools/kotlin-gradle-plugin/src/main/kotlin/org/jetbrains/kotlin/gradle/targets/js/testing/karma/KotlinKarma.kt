@@ -1,6 +1,6 @@
 /*
- * Copyright 2010-2019 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2020 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.gradle.targets.js.testing.karma
@@ -11,7 +11,11 @@ import org.gradle.api.Project
 import org.gradle.api.internal.tasks.testing.TestResultProcessor
 import org.gradle.internal.logging.progress.ProgressLogger
 import org.gradle.process.ProcessForkOptions
+import org.gradle.process.internal.ExecHandle
+import org.jetbrains.kotlin.gradle.internal.LogType
+import org.jetbrains.kotlin.gradle.internal.TeamCityMessageStackTraceProcessor
 import org.jetbrains.kotlin.gradle.internal.operation
+import org.jetbrains.kotlin.gradle.internal.processLogMessage
 import org.jetbrains.kotlin.gradle.internal.testing.TCServiceMessagesClientSettings
 import org.jetbrains.kotlin.gradle.internal.testing.TCServiceMessagesTestExecutionSpec
 import org.jetbrains.kotlin.gradle.internal.testing.TCServiceMessagesTestExecutor.Companion.TC_PROJECT_PROPERTY
@@ -71,12 +75,21 @@ class KotlinKarma(override val compilation: KotlinJsCompilation) :
         config.reporters.add("karma-kotlin-reporter")
 
         confJsWriters.add {
+            // Not all log events goes through this appender
+            // For example Error in config file
             //language=ES6
             it.appendln(
                 """
                 config.plugins = config.plugins || [];
-                config.plugins.push('karma-*'); // default
                 config.plugins.push('kotlin-test-js-runner/karma-kotlin-reporter.js');
+                
+                config.loggers = [
+                    {
+                        type: 'kotlin-test-js-runner/tc-log-appender.js',
+                        //default layout
+                        layout: { type: 'pattern', pattern: '%[%d{DATE}:%p [%c]: %]%m' }
+                    }
+                ]
             """.trimIndent()
             )
         }
@@ -403,17 +416,83 @@ class KotlinKarma(override val compilation: KotlinJsCompilation) :
                 object : JSServiceMessagesClient(
                     testResultProcessor,
                     clientSettings,
-                    log,
-                    suppressedOutput
+                    log
                 ) {
                     val baseTestNameSuffix get() = settings.testNameSuffix
                     override var testNameSuffix: String? = baseTestNameSuffix
 
-                    override fun printNonTestOutput(text: String) {
+                    private val failedBrowsers: MutableList<String> = mutableListOf()
+
+                    private var stackTraceProcessor =
+                        TeamCityMessageStackTraceProcessor()
+
+                    override fun printNonTestOutput(text: String, type: LogType?) {
                         val value = text.trimEnd()
                         progressLogger.progress(value)
 
-                        super.printNonTestOutput(text)
+                        parseConsole(value, type)
+                    }
+
+                    private fun parseConsole(text: String, type: LogType?) {
+
+                        var actualType = type
+                        val inStackTrace = stackTraceProcessor.process(text) { line, logType ->
+                            log.processLogMessage(line, logType)
+                        }
+
+                        if (inStackTrace) return
+
+                        val launcherMessage = KARMA_MESSAGE.matchEntire(text)
+
+                        val actualText = if (launcherMessage != null) {
+                            val (logLevel, message) = launcherMessage.destructured
+                            actualType = LogType.byValueOrNull(logLevel.toLowerCase())
+                            if (actualType?.isErrorLike() == true) {
+                                processFailedBrowsers(text)
+                            }
+                            message
+                        } else {
+                            text
+                        }
+
+                        actualType?.let { log.processLogMessage(actualText, it) }
+                            ?: super.printNonTestOutput(text, type)
+
+                    }
+
+                    private fun processFailedBrowsers(text: String) {
+                        config.browsers
+                            .filter { it in text }
+                            .filterNot { it in failedBrowsers }
+                            .also {
+                                failedBrowsers.addAll(it)
+                            }
+                    }
+
+                    override fun testFailedMessage(execHandle: ExecHandle, exitValue: Int): String {
+                        if (failedBrowsers.isEmpty()) {
+                            return super.testFailedMessage(execHandle, exitValue)
+                        }
+
+                        val failedBrowsers = failedBrowsers
+                            .joinToString("\n") {
+                                "- $it"
+                            }
+                        return """
+                            |Errors occurred during launch of browser for testing.
+                            |$failedBrowsers
+                            |Please make sure that you have installed browsers.
+                            |Or change it via
+                            |browser {
+                            |    testTask {
+                            |        useKarma {
+                            |            useFirefox()
+                            |            useChrome()
+                            |            useSafari()
+                            |        }
+                            |    }
+                            |}
+                            """.trimMargin()
                     }
 
                     override fun processStackTrace(stackTrace: String): String =
@@ -458,3 +537,6 @@ class KotlinKarma(override val compilation: KotlinJsCompilation) :
         appendln()
     }
 }
+
+private val KARMA_MESSAGE = "^.*\\d{2} \\d{2} \\d{4,} \\d{2}:\\d{2}:\\d{2}.\\d{3}:(ERROR|WARN|INFO|DEBUG|LOG) \\[.*]: ([\\w\\W]*)\$"
+    .toRegex()

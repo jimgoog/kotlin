@@ -17,8 +17,10 @@ import org.jetbrains.kotlin.fir.render
 import org.jetbrains.kotlin.fir.resolve.ResolutionMode
 import org.jetbrains.kotlin.fir.resolve.ScopeSession
 import org.jetbrains.kotlin.fir.resolve.firProvider
+import org.jetbrains.kotlin.fir.resolve.transformers.AdapterForResolvePhase
 import org.jetbrains.kotlin.fir.resolve.transformers.ReturnTypeCalculator
 import org.jetbrains.kotlin.fir.resolve.transformers.TransformImplicitType
+import org.jetbrains.kotlin.fir.resolve.transformers.contracts.runContractResolveForLocalClass
 import org.jetbrains.kotlin.fir.symbols.impl.FirAccessorSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirCallableSymbol
 import org.jetbrains.kotlin.fir.types.FirImplicitTypeRef
@@ -28,7 +30,7 @@ import org.jetbrains.kotlin.fir.visitors.CompositeTransformResult
 import org.jetbrains.kotlin.fir.visitors.FirTransformer
 import org.jetbrains.kotlin.fir.visitors.compose
 
-@Deprecated("It is temp", level = DeprecationLevel.WARNING, replaceWith = ReplaceWith("TODO(\"что-то нормальное\")"))
+@AdapterForResolvePhase
 class FirImplicitTypeBodyResolveTransformerAdapter(private val scopeSession: ScopeSession) : FirTransformer<Nothing?>() {
     private val implicitBodyResolveComputationSession = ImplicitBodyResolveComputationSession()
 
@@ -51,13 +53,13 @@ class FirImplicitTypeBodyResolveTransformerAdapter(private val scopeSession: Sco
     }
 }
 
-fun <F : FirClass<F>> F.runBodiesResolutionForLocalClass(
+fun <F : FirClass<F>> F.runContractAndBodiesResolutionForLocalClass(
     components: FirAbstractBodyResolveTransformer.BodyResolveTransformerComponents,
     resolutionMode: ResolutionMode,
     localClassesNavigationInfo: LocalClassesNavigationInfo,
 ): F {
     val (designationMap, targetedClasses) = localClassesNavigationInfo.run {
-        designationMap to parentForClass.keys + this@runBodiesResolutionForLocalClass
+        designationMap to parentForClass.keys + this@runContractAndBodiesResolutionForLocalClass
     }
 
     val implicitBodyResolveComputationSession =
@@ -72,6 +74,8 @@ fun <F : FirClass<F>> F.runBodiesResolutionForLocalClass(
 
     val newContext = components.context.createSnapshotForLocalClasses(returnTypeCalculator, targetedClasses)
     returnTypeCalculator.outerBodyResolveContext = newContext
+
+    runContractResolveForLocalClass(components.session, components.scopeSession, components.context, targetedClasses)
 
     val transformer = FirImplicitAwareBodyResolveTransformer(
         components.session, components.scopeSession,

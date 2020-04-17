@@ -4886,6 +4886,16 @@ public class QuickFixTestGenerated extends AbstractQuickFixTest {
                 runTest("idea/testData/quickfix/createFromUsage/createSecondaryConstructor/thisCall.kt");
             }
 
+            @TestMetadata("tooManyArguments.kt")
+            public void testTooManyArguments() throws Exception {
+                runTest("idea/testData/quickfix/createFromUsage/createSecondaryConstructor/tooManyArguments.kt");
+            }
+
+            @TestMetadata("tooManyArgumentsWithImcompatibleType.kt")
+            public void testTooManyArgumentsWithImcompatibleType() throws Exception {
+                runTest("idea/testData/quickfix/createFromUsage/createSecondaryConstructor/tooManyArgumentsWithImcompatibleType.kt");
+            }
+
             @TestMetadata("wrongExpectedType.kt")
             public void testWrongExpectedType() throws Exception {
                 runTest("idea/testData/quickfix/createFromUsage/createSecondaryConstructor/wrongExpectedType.kt");
@@ -9508,6 +9518,39 @@ public class QuickFixTestGenerated extends AbstractQuickFixTest {
         }
     }
 
+    @TestMetadata("idea/testData/quickfix/moveTypeAliasToTopLevel")
+    @TestDataPath("$PROJECT_ROOT")
+    @RunWith(JUnit3RunnerWithInners.class)
+    public static class MoveTypeAliasToTopLevel extends AbstractQuickFixTest {
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        public void testAllFilesPresentInMoveTypeAliasToTopLevel() throws Exception {
+            KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("idea/testData/quickfix/moveTypeAliasToTopLevel"), Pattern.compile("^([\\w\\-_]+)\\.kt$"), null, true);
+        }
+
+        @TestMetadata("inClass.kt")
+        public void testInClass() throws Exception {
+            runTest("idea/testData/quickfix/moveTypeAliasToTopLevel/inClass.kt");
+        }
+
+        @TestMetadata("inClass2.kt")
+        public void testInClass2() throws Exception {
+            runTest("idea/testData/quickfix/moveTypeAliasToTopLevel/inClass2.kt");
+        }
+
+        @TestMetadata("inFunction.kt")
+        public void testInFunction() throws Exception {
+            runTest("idea/testData/quickfix/moveTypeAliasToTopLevel/inFunction.kt");
+        }
+
+        @TestMetadata("inFunction2.kt")
+        public void testInFunction2() throws Exception {
+            runTest("idea/testData/quickfix/moveTypeAliasToTopLevel/inFunction2.kt");
+        }
+    }
+
     @TestMetadata("idea/testData/quickfix/nullables")
     @TestDataPath("$PROJECT_ROOT")
     @RunWith(JUnit3RunnerWithInners.class)
@@ -9692,6 +9735,16 @@ public class QuickFixTestGenerated extends AbstractQuickFixTest {
         @TestMetadata("importAlias.kt")
         public void testImportAlias() throws Exception {
             runTest("idea/testData/quickfix/optimizeImports/importAlias.kt");
+        }
+
+        @TestMetadata("invoke.kt")
+        public void testInvoke() throws Exception {
+            runTest("idea/testData/quickfix/optimizeImports/invoke.kt");
+        }
+
+        @TestMetadata("invoke2.kt")
+        public void testInvoke2() throws Exception {
+            runTest("idea/testData/quickfix/optimizeImports/invoke2.kt");
         }
     }
 
@@ -10040,6 +10093,16 @@ public class QuickFixTestGenerated extends AbstractQuickFixTest {
             @TestMetadata("changeOverriddenPropertyType2.kt")
             public void testChangeOverriddenPropertyType2() throws Exception {
                 runTest("idea/testData/quickfix/override/typeMismatchOnOverride/changeOverriddenPropertyType2.kt");
+            }
+
+            @TestMetadata("changeOverriddenPropertyTypeFromCtorParameter.kt")
+            public void testChangeOverriddenPropertyTypeFromCtorParameter() throws Exception {
+                runTest("idea/testData/quickfix/override/typeMismatchOnOverride/changeOverriddenPropertyTypeFromCtorParameter.kt");
+            }
+
+            @TestMetadata("changeOverridingCtorParameterType.kt")
+            public void testChangeOverridingCtorParameterType() throws Exception {
+                runTest("idea/testData/quickfix/override/typeMismatchOnOverride/changeOverridingCtorParameterType.kt");
             }
 
             @TestMetadata("changeOverridingPropertyTypeToFunctionType.kt")

@@ -29,16 +29,14 @@ import org.jetbrains.kotlin.incremental.record
 import org.jetbrains.kotlin.load.java.descriptors.JavaClassConstructorDescriptor
 import org.jetbrains.kotlin.load.java.descriptors.JavaClassDescriptor
 import org.jetbrains.kotlin.load.java.descriptors.JavaMethodDescriptor
+import org.jetbrains.kotlin.load.java.lazy.descriptors.LazyJavaClassDescriptor
 import org.jetbrains.kotlin.load.java.sam.JavaSingleAbstractMethodUtils
 import org.jetbrains.kotlin.load.java.sam.SamAdapterDescriptor
-import org.jetbrains.kotlin.load.java.sam.SamConstructorDescriptor
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.resolve.calls.components.isVararg
 import org.jetbrains.kotlin.resolve.calls.inference.wrapWithCapturingSubstitution
 import org.jetbrains.kotlin.resolve.deprecation.DeprecationResolver
-import org.jetbrains.kotlin.resolve.sam.SAM_LOOKUP_NAME
-import org.jetbrains.kotlin.resolve.sam.SamConversionOracle
-import org.jetbrains.kotlin.resolve.sam.SamConversionResolver
+import org.jetbrains.kotlin.resolve.sam.*
 import org.jetbrains.kotlin.resolve.scopes.DescriptorKindFilter
 import org.jetbrains.kotlin.resolve.scopes.ResolutionScope
 import org.jetbrains.kotlin.resolve.scopes.SyntheticScope
@@ -74,9 +72,8 @@ class SamAdapterFunctionsScope(
         }
 
     private val samConstructorForClassifier =
-        storageManager.createMemoizedFunction<ClassDescriptor, SamConstructorDescriptor> { classifier ->
-            JavaSingleAbstractMethodUtils
-                .createSamConstructorFunction(classifier.containingDeclaration, classifier, samResolver, samConversionOracle)
+        storageManager.createMemoizedFunction<JavaClassDescriptor, SamConstructorDescriptor> { classifier ->
+            createSamConstructorFunction(classifier.containingDeclaration, classifier, samResolver, samConversionOracle)
         }
 
     private val samConstructorForJavaConstructor =
@@ -261,17 +258,16 @@ class SamAdapterFunctionsScope(
             return getTypeAliasSamConstructor(classifier)
         }
 
-        if (classifier !is ClassDescriptor) return null
-        if (!JavaSingleAbstractMethodUtils.isSamClassDescriptor(classifier)) return null
+        if (classifier !is LazyJavaClassDescriptor || classifier.defaultFunctionTypeForSamInterface == null) return null
 
         return samConstructorForClassifier(classifier)
     }
 
     private fun getTypeAliasSamConstructor(classifier: TypeAliasDescriptor): SamConstructorDescriptor? {
         val classDescriptor = classifier.classDescriptor ?: return null
-        if (!JavaSingleAbstractMethodUtils.isSamClassDescriptor(classDescriptor)) return null
+        if (classDescriptor !is LazyJavaClassDescriptor || classDescriptor.defaultFunctionTypeForSamInterface == null) return null
 
-        return JavaSingleAbstractMethodUtils.createTypeAliasSamConstructorFunction(
+        return createTypeAliasSamConstructorFunction(
             classifier, samConstructorForClassifier(classDescriptor), samResolver, samConversionOracle
         )
     }

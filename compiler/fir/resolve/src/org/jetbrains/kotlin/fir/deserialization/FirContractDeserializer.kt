@@ -7,7 +7,7 @@ package org.jetbrains.kotlin.fir.deserialization
 
 import org.jetbrains.kotlin.contracts.description.InvocationKind
 import org.jetbrains.kotlin.fir.contracts.FirContractDescription
-import org.jetbrains.kotlin.fir.contracts.builder.buildContractDescription
+import org.jetbrains.kotlin.fir.contracts.builder.buildResolvedContractDescription
 import org.jetbrains.kotlin.fir.contracts.description.*
 import org.jetbrains.kotlin.fir.declarations.FirContractDescriptionOwner
 import org.jetbrains.kotlin.fir.declarations.FirSimpleFunction
@@ -22,7 +22,7 @@ import org.jetbrains.kotlin.utils.addIfNotNull
 class FirContractDeserializer(private val c: FirDeserializationContext) {
     fun loadContract(proto: ProtoBuf.Contract, owner: FirContractDescriptionOwner): FirContractDescription? {
         val effects = proto.effectList.map { loadPossiblyConditionalEffect(it, owner) ?: return null }
-        return buildContractDescription {
+        return buildResolvedContractDescription {
             this.effects += effects
         }
     }
@@ -125,16 +125,20 @@ class FirContractDeserializer(private val c: FirDeserializationContext) {
 
         val valueParameterIndex = proto.valueParameterReference - 1
 
+        val name: String
         val typeRef = if (valueParameterIndex < 0) {
+            name = "this"
             ownerFunction.receiverTypeRef
         } else {
-            ownerFunction.valueParameters.getOrNull(valueParameterIndex)?.returnTypeRef
+            val parameter = ownerFunction.valueParameters.getOrNull(valueParameterIndex) ?: return null
+            name = parameter.name.asString()
+            parameter.returnTypeRef
         } ?: return null
 
         return if (!typeRef.isBoolean)
-            ConeValueParameterReference(valueParameterIndex)
+            ConeValueParameterReference(valueParameterIndex, name)
         else
-            ConeBooleanValueParameterReference(valueParameterIndex)
+            ConeBooleanValueParameterReference(valueParameterIndex, name)
     }
 
     private fun ProtoBuf.Effect.InvocationKind.toDescriptorInvocationKind(): InvocationKind? = when (this) {

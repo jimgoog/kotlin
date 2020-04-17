@@ -52,7 +52,7 @@ import org.jetbrains.kotlin.descriptors.impl.TypeAliasConstructorDescriptor;
 import org.jetbrains.kotlin.diagnostics.Errors;
 import org.jetbrains.kotlin.lexer.KtTokens;
 import org.jetbrains.kotlin.load.java.JvmAbi;
-import org.jetbrains.kotlin.load.java.sam.SamConstructorDescriptor;
+import org.jetbrains.kotlin.resolve.sam.SamConstructorDescriptor;
 import org.jetbrains.kotlin.load.kotlin.MethodSignatureMappingKt;
 import org.jetbrains.kotlin.load.kotlin.TypeSignatureMappingKt;
 import org.jetbrains.kotlin.name.Name;
@@ -1759,8 +1759,7 @@ public class ExpressionCodegen extends KtVisitor<StackValue, StackValue> impleme
         if (!endsWithReturn(expr)) {
             if (isLambdaVoidBody(expr, typeForExpression)) {
                 markLineNumber((KtFunctionLiteral) expr.getParent(), true);
-            }
-            else {
+            } else if (!isLambdaBody(expr)){
                 markLineNumber(expr, true);
             }
 
@@ -1782,13 +1781,14 @@ public class ExpressionCodegen extends KtVisitor<StackValue, StackValue> impleme
     }
 
     private static boolean isLambdaVoidBody(@NotNull KtElement bodyExpression, @NotNull Type returnType) {
+        return isLambdaBody(bodyExpression) && Type.VOID_TYPE.equals(returnType);
+    }
+
+    private static boolean isLambdaBody(@NotNull KtElement bodyExpression) {
         if (bodyExpression instanceof KtBlockExpression) {
             PsiElement parent = bodyExpression.getParent();
-            if (parent instanceof KtFunctionLiteral) {
-                return Type.VOID_TYPE.equals(returnType);
-            }
+            return parent instanceof KtFunctionLiteral;
         }
-
         return false;
     }
 
@@ -2646,7 +2646,7 @@ public class ExpressionCodegen extends KtVisitor<StackValue, StackValue> impleme
 
         KotlinType returnType = resolvedCall.getResultingDescriptor().getReturnType();
         if (returnType != null && KotlinBuiltIns.isNothing(returnType)) {
-            if (state.getLanguageVersionSettings().getApiVersion().compareTo(ApiVersion.KOTLIN_1_4) >= 0) {
+            if (state.getUseKotlinNothingValueException()) {
                 v.anew(Type.getObjectType("kotlin/KotlinNothingValueException"));
                 v.dup();
                 v.invokespecial("kotlin/KotlinNothingValueException", "<init>", "()V", false);

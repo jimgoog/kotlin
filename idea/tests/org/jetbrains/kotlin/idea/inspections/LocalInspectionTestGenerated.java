@@ -2470,6 +2470,11 @@ public class LocalInspectionTestGenerated extends AbstractLocalInspectionTest {
             runTest("idea/testData/inspectionsLocal/constantConditionIf/endWithElseIf.kt");
         }
 
+        @TestMetadata("endWithElseIf2.kt")
+        public void testEndWithElseIf2() throws Exception {
+            runTest("idea/testData/inspectionsLocal/constantConditionIf/endWithElseIf2.kt");
+        }
+
         @TestMetadata("endWithElseIfNoBraces.kt")
         public void testEndWithElseIfNoBraces() throws Exception {
             runTest("idea/testData/inspectionsLocal/constantConditionIf/endWithElseIfNoBraces.kt");
@@ -2533,6 +2538,11 @@ public class LocalInspectionTestGenerated extends AbstractLocalInspectionTest {
         @TestMetadata("expressionElseIfBlock.kt")
         public void testExpressionElseIfBlock() throws Exception {
             runTest("idea/testData/inspectionsLocal/constantConditionIf/expressionElseIfBlock.kt");
+        }
+
+        @TestMetadata("expressionElseIfBlock2.kt")
+        public void testExpressionElseIfBlock2() throws Exception {
+            runTest("idea/testData/inspectionsLocal/constantConditionIf/expressionElseIfBlock2.kt");
         }
 
         @TestMetadata("noStatements.kt")
@@ -9072,6 +9082,21 @@ public class LocalInspectionTestGenerated extends AbstractLocalInspectionTest {
             runTest("idea/testData/inspectionsLocal/removeRedundantQualifierName/notApplicableCompanionType2.kt");
         }
 
+        @TestMetadata("notApplicableEnumCompanion.kt")
+        public void testNotApplicableEnumCompanion() throws Exception {
+            runTest("idea/testData/inspectionsLocal/removeRedundantQualifierName/notApplicableEnumCompanion.kt");
+        }
+
+        @TestMetadata("notApplicableEnumCompanion2.kt")
+        public void testNotApplicableEnumCompanion2() throws Exception {
+            runTest("idea/testData/inspectionsLocal/removeRedundantQualifierName/notApplicableEnumCompanion2.kt");
+        }
+
+        @TestMetadata("notApplicableEnumCompanion3.kt")
+        public void testNotApplicableEnumCompanion3() throws Exception {
+            runTest("idea/testData/inspectionsLocal/removeRedundantQualifierName/notApplicableEnumCompanion3.kt");
+        }
+
         @TestMetadata("notApplicableEnumEntry.kt")
         public void testNotApplicableEnumEntry() throws Exception {
             runTest("idea/testData/inspectionsLocal/removeRedundantQualifierName/notApplicableEnumEntry.kt");
@@ -9095,6 +9120,16 @@ public class LocalInspectionTestGenerated extends AbstractLocalInspectionTest {
         @TestMetadata("notApplicableEnumInEnum2.kt")
         public void testNotApplicableEnumInEnum2() throws Exception {
             runTest("idea/testData/inspectionsLocal/removeRedundantQualifierName/notApplicableEnumInEnum2.kt");
+        }
+
+        @TestMetadata("notApplicableEnumValueOf.kt")
+        public void testNotApplicableEnumValueOf() throws Exception {
+            runTest("idea/testData/inspectionsLocal/removeRedundantQualifierName/notApplicableEnumValueOf.kt");
+        }
+
+        @TestMetadata("notApplicableEnumValues.kt")
+        public void testNotApplicableEnumValues() throws Exception {
+            runTest("idea/testData/inspectionsLocal/removeRedundantQualifierName/notApplicableEnumValues.kt");
         }
 
         @TestMetadata("notApplicableExpression.kt")
@@ -9847,6 +9882,21 @@ public class LocalInspectionTestGenerated extends AbstractLocalInspectionTest {
         @TestMetadata("countOfCollection.kt")
         public void testCountOfCollection() throws Exception {
             runTest("idea/testData/inspectionsLocal/replaceCollectionCountWithSize/countOfCollection.kt");
+        }
+
+        @TestMetadata("countOfIterable.kt")
+        public void testCountOfIterable() throws Exception {
+            runTest("idea/testData/inspectionsLocal/replaceCollectionCountWithSize/countOfIterable.kt");
+        }
+
+        @TestMetadata("countOfIterable2.kt")
+        public void testCountOfIterable2() throws Exception {
+            runTest("idea/testData/inspectionsLocal/replaceCollectionCountWithSize/countOfIterable2.kt");
+        }
+
+        @TestMetadata("countOfIterable3.kt")
+        public void testCountOfIterable3() throws Exception {
+            runTest("idea/testData/inspectionsLocal/replaceCollectionCountWithSize/countOfIterable3.kt");
         }
 
         @TestMetadata("countOfMap.kt")

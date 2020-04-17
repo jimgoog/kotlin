@@ -62,7 +62,7 @@ internal class FirClassImpl(
         transformAnnotations(transformer, data)
         typeParameters.transformInplace(transformer, data)
         transformStatus(transformer, data)
-        declarations.transformInplace(transformer, data)
+        transformDeclarations(transformer, data)
         companionObject = declarations.asSequence().filterIsInstance<FirRegularClass>().firstOrNull { it.status.isCompanion }
         superTypeRefs.transformInplace(transformer, data)
         transformControlFlowGraphReference(transformer, data)
@@ -76,6 +76,16 @@ internal class FirClassImpl(
 
     override fun <D> transformStatus(transformer: FirTransformer<D>, data: D): FirClassImpl {
         status = status.transformSingle(transformer, data)
+        return this
+    }
+
+    override fun <D> transformDeclarations(transformer: FirTransformer<D>, data: D): FirClassImpl {
+        declarations.transformInplace(transformer, data)
+        return this
+    }
+
+    override fun <D> transformCompanionObject(transformer: FirTransformer<D>, data: D): FirClassImpl {
+        companionObject = companionObject?.transformSingle(transformer, data)
         return this
     }
 

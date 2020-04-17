@@ -5,6 +5,7 @@
 
 package org.jetbrains.kotlin.backend.jvm.codegen
 
+import org.jetbrains.kotlin.backend.common.ir.isMethodOfAny
 import org.jetbrains.kotlin.backend.common.ir.isTopLevel
 import org.jetbrains.kotlin.backend.common.lower.allOverridden
 import org.jetbrains.kotlin.backend.common.lower.parentsWithSelf
@@ -182,8 +183,8 @@ class MethodSignatureMapper(private val context: JvmBackendContext) {
     private fun forceBoxedReturnType(function: IrFunction): Boolean {
         if (isBoxMethodForInlineClass(function)) return true
 
-        return isJvmPrimitive(function.returnType) &&
-                function is IrSimpleFunction && function.allOverridden().any { !isJvmPrimitive(it.returnType) }
+        return isJvmPrimitiveOrInlineClass(function.returnType) &&
+                function is IrSimpleFunction && function.allOverridden().any { !isJvmPrimitiveOrInlineClass(it.returnType) }
     }
 
     private fun isBoxMethodForInlineClass(function: IrFunction): Boolean =
@@ -191,10 +192,8 @@ class MethodSignatureMapper(private val context: JvmBackendContext) {
                 function.origin == JvmLoweredDeclarationOrigin.SYNTHETIC_INLINE_CLASS_MEMBER &&
                 function.name.asString() == "box-impl"
 
-    private fun isJvmPrimitive(type: IrType): Boolean {
-        if (type.isPrimitiveType()) return true
-        return type.getClass()?.isInline == true && AsmUtil.isPrimitive(typeMapper.mapType(type))
-    }
+    private fun isJvmPrimitiveOrInlineClass(type: IrType): Boolean =
+        type.isPrimitiveType() || type.getClass()?.isInline == true
 
     fun mapSignatureSkipGeneric(function: IrFunction): JvmMethodSignature =
         mapSignature(function, true)
@@ -360,7 +359,9 @@ class MethodSignatureMapper(private val context: JvmBackendContext) {
                 continue
             }
             if (isSuperCall && !current.parentAsClass.isInterface &&
-                current.resolveFakeOverride()?.isCompiledToJvmDefault(context.state.jvmDefaultMode) != true
+                current.resolveFakeOverride()?.run {
+                    isMethodOfAny() || !isCompiledToJvmDefault(context.state.jvmDefaultMode)
+                } == true
             ) {
                 return current
             }

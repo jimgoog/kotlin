@@ -365,6 +365,7 @@ allprojects {
         "-Xread-deserialized-contracts",
         "-Xjvm-default=compatibility",
         "-Xno-optimized-callable-references",
+        "-Xno-kotlin-nothing-value-exception",
         "-progressive".takeIf { hasProperty("test.progressive.mode") }
     )
 
@@ -600,6 +601,7 @@ tasks {
 //        dependsOn(":kotlin-scripting-jvm-host-test:embeddableTest")
         dependsOn(":kotlin-scripting-jsr223-test:embeddableTest")
         dependsOn(":kotlin-main-kts-test:test")
+        dependsOn(":kotlin-scripting-ide-services-test:test")
     }
 
     register("compilerTest") {
