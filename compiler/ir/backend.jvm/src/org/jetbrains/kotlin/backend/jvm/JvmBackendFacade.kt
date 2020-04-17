@@ -116,7 +116,7 @@ object JvmBackendFacade {
                             throw AssertionError("File-level declaration should be IrClass after JvmLower, got: " + loweredClass.render())
                         }
 
-                        ClassCodegen.getOrCreate(loweredClass, context)
+                        ClassCodegen.getOrCreate(loweredClass, context).generate()
                     }
                 } catch (e: Throwable) {
                     CodegenUtil.reportBackendException(e, "code generation", irFile.fileEntry.name)

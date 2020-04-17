@@ -55,7 +55,15 @@ internal class FirDelegatedConstructorCallImpl(
         return this
     }
 
+    override fun replaceCalleeReference(newCalleeReference: FirReference) {
+        calleeReference = newCalleeReference
+    }
+
     override fun replaceArgumentList(newArgumentList: FirArgumentList) {
         argumentList = newArgumentList
+    }
+
+    override fun replaceConstructedTypeRef(newConstructedTypeRef: FirTypeRef) {
+        constructedTypeRef = newConstructedTypeRef
     }
 }

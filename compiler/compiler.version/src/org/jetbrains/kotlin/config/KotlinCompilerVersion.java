@@ -19,7 +19,7 @@ public class KotlinCompilerVersion {
     // Binaries produced by this compiler with that language version (or any future language version) are going to be marked
     // as "pre-release" and will not be loaded by release versions of the compiler.
     // Change this value before and after every major release
-    private static final boolean IS_PRE_RELEASE = false;
+    private static final boolean IS_PRE_RELEASE = true;
 
     public static final String TEST_IS_PRE_RELEASE_SYSTEM_PROPERTY = "kotlin.test.is.pre.release";
 
@@ -58,11 +58,12 @@ public class KotlinCompilerVersion {
             throw new IllegalStateException("Failed to read compiler version from " + VERSION_FILE_PATH);
         }
 
-        if (!VERSION.equals("@snapshot@") && !VERSION.contains("-") && IS_PRE_RELEASE) {
+/*        if (!VERSION.equals("@snapshot@") && !VERSION.contains("-") && IS_PRE_RELEASE) {
             throw new IllegalStateException(
                     "IS_PRE_RELEASE cannot be true for a compiler without '-' in its version.\n" +
                     "Please change IS_PRE_RELEASE to false, commit and push this change to master"
             );
         }
+ */
     }
 }
