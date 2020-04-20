@@ -30,6 +30,7 @@ class FirFunctionTypeRefBuilder : FirAnnotationContainerBuilder {
     var receiverTypeRef: FirTypeRef? = null
     val valueParameters: MutableList<FirValueParameter> = mutableListOf()
     lateinit var returnTypeRef: FirTypeRef
+    var isSuspend: Boolean by kotlin.properties.Delegates.notNull<Boolean>()
 
     override fun build(): FirFunctionTypeRef {
         return FirFunctionTypeRefImpl(
@@ -39,6 +40,7 @@ class FirFunctionTypeRefBuilder : FirAnnotationContainerBuilder {
             receiverTypeRef,
             valueParameters,
             returnTypeRef,
+            isSuspend,
         )
     }
 

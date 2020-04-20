@@ -27,6 +27,7 @@ class FirResolvedTypeRefBuilder : FirAnnotationContainerBuilder {
     override val annotations: MutableList<FirAnnotationCall> = mutableListOf()
     lateinit var type: ConeKotlinType
     var delegatedTypeRef: FirTypeRef? = null
+    var isSuspend: Boolean = false
 
     override fun build(): FirResolvedTypeRef {
         return FirResolvedTypeRefImpl(
@@ -34,6 +35,7 @@ class FirResolvedTypeRefBuilder : FirAnnotationContainerBuilder {
             annotations,
             type,
             delegatedTypeRef,
+            isSuspend,
         )
     }
 

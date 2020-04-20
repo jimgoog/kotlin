@@ -128,15 +128,19 @@ class ExpressionsConverter(
             }
         }
 
-        val labelName = lambdaExpression.getLabelName() ?: context.firFunctionCalls.lastOrNull()?.calleeReference?.name?.asString()
-        val target = FirFunctionTarget(labelName = labelName, isLambda = true)
+        val expressionSource = lambdaExpression.toFirSourceElement()
+        val target: FirFunctionTarget
         return buildAnonymousFunction {
-            source = lambdaExpression.toFirSourceElement()
+            source = expressionSource
             session = baseSession
             returnTypeRef = implicitType
             receiverTypeRef = implicitType
             symbol = FirAnonymousFunctionSymbol()
             isLambda = true
+            label = context.firLabels.pop() ?: context.firFunctionCalls.lastOrNull()?.calleeReference?.name?.let {
+                buildLabel { name = it.asString() }
+            }
+            target = FirFunctionTarget(labelName = label?.name, isLambda = true)
             context.firFunctionTargets += target
             var destructuringBlock: FirExpression? = null
             for (valueParameter in valueParameterList) {
@@ -164,14 +168,17 @@ class ExpressionsConverter(
                     valueParameter.firValueParameter
                 }
             }
-            label = context.firLabels.pop() ?: context.firFunctionCalls.lastOrNull()?.calleeReference?.name?.let {
-                buildLabel { name = it.asString() }
-            }
-            
+
             body = if (block != null) {
                 declarationsConverter.convertBlockExpressionWithoutBuilding(block!!).apply {
                     if (statements.isEmpty()) {
-                        statements.add(buildUnitExpression())
+                        statements.add(
+                            buildReturnExpression {
+                                source = expressionSource
+                                this.target = target
+                                result = buildUnitExpression { source = expressionSource }
+                            }
+                        )
                     }
                     if (destructuringBlock is FirBlock) {
                         for ((index, statement) in destructuringBlock.statements.withIndex()) {
