@@ -5,15 +5,12 @@
 
 package org.jetbrains.kotlin.idea.debugger.coroutine.proxy
 
-import com.intellij.debugger.engine.DebugProcess
 import com.intellij.debugger.engine.evaluation.EvaluateException
-import com.intellij.debugger.jdi.ClassesByNameProvider
-import com.intellij.debugger.jdi.GeneratedLocation
-import com.intellij.util.containers.ContainerUtil
 import com.sun.jdi.*
 import org.jetbrains.kotlin.idea.debugger.coroutine.data.*
 import org.jetbrains.kotlin.idea.debugger.coroutine.proxy.mirror.CoroutineContext
 import org.jetbrains.kotlin.idea.debugger.coroutine.proxy.mirror.JavaLangMirror
+import org.jetbrains.kotlin.idea.debugger.coroutine.util.isCreationSeparatorFrame
 import org.jetbrains.kotlin.idea.debugger.evaluate.DefaultExecutionContext
 
 class CoroutineLibraryAgentProxy(private val debugProbesClsRef: ClassType, private val executionContext: DefaultExecutionContext) :
@@ -41,8 +38,7 @@ class CoroutineLibraryAgentProxy(private val debugProbesClsRef: ClassType, priva
 
     // value
     private val vm = executionContext.vm
-    private val classesByName = ClassesByNameProvider.createCache(vm.allClasses())
-
+    private val locationCache = LocationCache(executionContext)
 
     private val coroutineContext: CoroutineContext = CoroutineContext(executionContext)
 
@@ -77,47 +73,21 @@ class CoroutineLibraryAgentProxy(private val debugProbesClsRef: ClassType, priva
         val coroutineStackTrace = stackTrace.take(creationFrameSeparatorIndex)
 
         val coroutineStackTraceFrameItems = coroutineStackTrace.map {
-            SuspendCoroutineStackFrameItem(it, createLocation(it))
+            SuspendCoroutineStackFrameItem(it, locationCache.createLocation(it))
         }
         val creationStackTrace = stackTrace.subList(creationFrameSeparatorIndex + 1, stackTrace.size)
-        val creationStackTraceFrameItems = creationStackTrace.map {
-            CreationCoroutineStackFrameItem(it, createLocation(it))
+        val creationStackTraceFrameItems = creationStackTrace.mapIndexed { index, stackTraceElement ->
+            CreationCoroutineStackFrameItem(stackTraceElement, locationCache.createLocation(stackTraceElement), index == 0)
         }
-        val key = CoroutineNameIdState(name,"", State.valueOf(state))
+        val key = CoroutineNameIdState(name, "", State.valueOf(state), "")
 
         return CoroutineInfoData(
             key,
-            coroutineStackTraceFrameItems,
+            coroutineStackTraceFrameItems.toMutableList(),
             creationStackTraceFrameItems,
             thread,
             lastObservedFrameFieldRef
         )
-    }
-
-
-    private fun createLocation(stackTraceElement: StackTraceElement): Location = findLocation(
-        ContainerUtil.getFirstItem(classesByName[stackTraceElement.className]),
-        stackTraceElement.methodName,
-        stackTraceElement.lineNumber
-    )
-
-    private fun findLocation(
-        type: ReferenceType?,
-        methodName: String,
-        line: Int
-    ): Location {
-        if (type != null && line >= 0) {
-            try {
-                val location = type.locationsOfLine(DebugProcess.JAVA_STRATUM, null, line).stream()
-                    .filter { l: Location -> l.method().name() == methodName }
-                    .findFirst().orElse(null)
-                if (location != null) {
-                    return location
-                }
-            } catch (ignored: AbsentInformationException) {
-            }
-        }
-        return GeneratedLocation(executionContext.debugProcess, type, methodName, line)
     }
 
     /**

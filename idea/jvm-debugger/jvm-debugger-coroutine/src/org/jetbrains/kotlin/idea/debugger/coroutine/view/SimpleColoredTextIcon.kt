@@ -117,7 +117,7 @@ class SimpleColoredTextIconPresentationRenderer {
         val hasChildren = infoData.stackTrace.isNotEmpty() || infoData.creationStackTrace.isNotEmpty()
         val label = SimpleColoredTextIcon(icon, hasChildren)
         label.append("\"")
-        label.appendValue(infoData.key.name)
+        label.appendValue(infoData.key.formatName())
         label.append("\": ${infoData.key.state}")
         if (name.isNotEmpty()) {
             label.append(" on thread \"")
@@ -181,7 +181,7 @@ class SimpleColoredTextIconPresentationRenderer {
         SimpleColoredTextIcon(
             AllIcons.Debugger.ThreadSuspended,
             true,
-            KotlinDebuggerCoroutinesBundle.message("coroutine.dump.creation.frame", infoData.key.name)
+            KotlinDebuggerCoroutinesBundle.message("coroutine.dump.creation.trace")
         )
 
     fun renderErrorNode(error: String) =

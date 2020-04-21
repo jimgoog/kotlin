@@ -1,0 +1,27 @@
+LineBreakpoint created at suspendLambda.kt:12
+Run Java
+Connected to the target VM
+suspendLambda.kt:12
+Thread stack trace:
+	nextSequence:12, SuspendLambdaKt (continuation)
+		(terms, terms1)
+	invokeSuspend:23, SuspendLambdaKt$fibonacci$1 (continuation)
+		($result, $this$sequence, step, terms, this)
+CoroutineNameIdState(name=coroutine, id=-1, state=UNKNOWN, dispatcher=null)
+	resumeWith:33, kotlin.coroutines.jvm.internal.BaseContinuationImpl
+		($i$a$-with-BaseContinuationImpl$resumeWith$1, $this$with, completion, current, param, result, this)
+	hasNext:140, kotlin.sequences.SequenceBuilderIterator
+		(step, this)
+	hasNext:406, kotlin.sequences.TakeSequence$iterator$1
+		(this)
+	toCollection:722, kotlin.sequences.SequencesKt___SequencesKt
+		($this$toCollection, destination)
+	toMutableList:752, kotlin.sequences.SequencesKt___SequencesKt
+		($this$toMutableList)
+	toList:743, kotlin.sequences.SequencesKt___SequencesKt
+		($this$toList)
+	main:5, continuation.SuspendLambdaKt
+		(a)
+Disconnected from the target VM
+
+Process finished with exit code 0

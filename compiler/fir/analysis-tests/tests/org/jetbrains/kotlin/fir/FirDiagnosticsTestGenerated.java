@@ -228,6 +228,11 @@ public class FirDiagnosticsTestGenerated extends AbstractFirDiagnosticsTest {
         runTest("compiler/fir/analysis-tests/testData/resolve/javaStaticScopeInheritance.kt");
     }
 
+    @TestMetadata("labelAndReceiverForInfix.kt")
+    public void testLabelAndReceiverForInfix() throws Exception {
+        runTest("compiler/fir/analysis-tests/testData/resolve/labelAndReceiverForInfix.kt");
+    }
+
     @TestMetadata("lambdaArgInScopeFunction.kt")
     public void testLambdaArgInScopeFunction() throws Exception {
         runTest("compiler/fir/analysis-tests/testData/resolve/lambdaArgInScopeFunction.kt");
@@ -582,6 +587,16 @@ public class FirDiagnosticsTestGenerated extends AbstractFirDiagnosticsTest {
         @TestMetadata("companionInvoke.kt")
         public void testCompanionInvoke() throws Exception {
             runTest("compiler/fir/analysis-tests/testData/resolve/callResolution/companionInvoke.kt");
+        }
+
+        @TestMetadata("debugExpressionType.kt")
+        public void testDebugExpressionType() throws Exception {
+            runTest("compiler/fir/analysis-tests/testData/resolve/callResolution/debugExpressionType.kt");
+        }
+
+        @TestMetadata("debugInfoCall.kt")
+        public void testDebugInfoCall() throws Exception {
+            runTest("compiler/fir/analysis-tests/testData/resolve/callResolution/debugInfoCall.kt");
         }
 
         @TestMetadata("invokeAmbiguity.kt")
@@ -1628,6 +1643,11 @@ public class FirDiagnosticsTestGenerated extends AbstractFirDiagnosticsTest {
         public void testMultipleJavaClassesInOneFile() throws Exception {
             runTest("compiler/fir/analysis-tests/testData/resolve/problems/multipleJavaClassesInOneFile.kt");
         }
+
+        @TestMetadata("safeCallInvoke.kt")
+        public void testSafeCallInvoke() throws Exception {
+            runTest("compiler/fir/analysis-tests/testData/resolve/problems/safeCallInvoke.kt");
+        }
     }
 
     @TestMetadata("compiler/fir/analysis-tests/testData/resolve/properties")
@@ -2166,6 +2186,11 @@ public class FirDiagnosticsTestGenerated extends AbstractFirDiagnosticsTest {
         @TestMetadata("protectedInCompanion.kt")
         public void testProtectedInCompanion() throws Exception {
             runTest("compiler/fir/analysis-tests/testData/resolve/visibility/protectedInCompanion.kt");
+        }
+
+        @TestMetadata("singletonConstructors.kt")
+        public void testSingletonConstructors() throws Exception {
+            runTest("compiler/fir/analysis-tests/testData/resolve/visibility/singletonConstructors.kt");
         }
     }
 }

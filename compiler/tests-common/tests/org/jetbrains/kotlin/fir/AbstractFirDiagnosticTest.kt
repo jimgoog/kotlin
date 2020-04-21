@@ -5,21 +5,44 @@
 
 package org.jetbrains.kotlin.fir
 
+import com.intellij.psi.PsiElement
 import junit.framework.TestCase
+import org.jetbrains.kotlin.checkers.diagnostics.factories.DebugInfoDiagnosticFactory1
+import org.jetbrains.kotlin.checkers.utils.TypeOfCall
+import org.jetbrains.kotlin.diagnostics.rendering.Renderers
 import org.jetbrains.kotlin.fir.analysis.collectors.AbstractDiagnosticCollector
 import org.jetbrains.kotlin.fir.analysis.collectors.FirDiagnosticsCollector
-import org.jetbrains.kotlin.fir.analysis.diagnostics.FirDiagnostic
+import org.jetbrains.kotlin.fir.analysis.diagnostics.*
+import org.jetbrains.kotlin.fir.declarations.FirCallableMemberDeclaration
 import org.jetbrains.kotlin.fir.declarations.FirFile
+import org.jetbrains.kotlin.fir.declarations.FirFunction
+import org.jetbrains.kotlin.fir.declarations.FirProperty
+import org.jetbrains.kotlin.fir.expressions.FirExpression
+import org.jetbrains.kotlin.fir.expressions.FirExpressionWithSmartcast
+import org.jetbrains.kotlin.fir.expressions.FirFunctionCall
 import org.jetbrains.kotlin.fir.references.FirControlFlowGraphReference
+import org.jetbrains.kotlin.fir.references.FirNamedReference
+import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference
 import org.jetbrains.kotlin.fir.resolve.dfa.FirControlFlowGraphReferenceImpl
 import org.jetbrains.kotlin.fir.resolve.dfa.cfg.CFGNode
 import org.jetbrains.kotlin.fir.resolve.dfa.cfg.ControlFlowGraph
 import org.jetbrains.kotlin.fir.resolve.dfa.cfg.EdgeKind
 import org.jetbrains.kotlin.fir.resolve.dfa.cfg.FirControlFlowGraphRenderVisitor
 import org.jetbrains.kotlin.fir.resolve.transformers.FirTotalResolveTransformer
+import org.jetbrains.kotlin.fir.symbols.AbstractFirBasedSymbol
+import org.jetbrains.kotlin.fir.symbols.impl.FirCallableSymbol
+import org.jetbrains.kotlin.fir.symbols.impl.FirClassLikeSymbol
+import org.jetbrains.kotlin.fir.symbols.impl.FirFunctionSymbol
+import org.jetbrains.kotlin.fir.types.ConeKotlinType
+import org.jetbrains.kotlin.fir.types.FirTypeRef
+import org.jetbrains.kotlin.fir.types.coneTypeSafe
+import org.jetbrains.kotlin.fir.visitors.FirDefaultVisitorVoid
 import org.jetbrains.kotlin.fir.visitors.FirVisitorVoid
+import org.jetbrains.kotlin.name.FqNameUnsafe
 import org.jetbrains.kotlin.test.KotlinTestUtils
 import org.jetbrains.kotlin.test.testFramework.KtUsefulTestCase
+import org.jetbrains.kotlin.util.OperatorNameConventions
+import org.jetbrains.kotlin.utils.addIfNotNull
 import java.io.File
 
 /*
@@ -84,13 +107,147 @@ abstract class AbstractFirDiagnosticsTest : AbstractFirBaseDiagnosticsTest() {
         for (testFile in testFiles) {
             val firFile = firFiles.firstOrNull { it.psi == testFile.ktFile }
             if (firFile != null) {
-                testFile.getActualText(diagnostics.getValue(firFile), actualText)
+                val debugInfoDiagnostics: List<FirDiagnostic<*>> =
+                    collectDebugInfoDiagnostics(firFile, testFile.diagnosedRangesToDiagnosticNames)
+                testFile.getActualText(
+                    diagnostics.getValue(firFile) + debugInfoDiagnostics,
+                    actualText,
+                )
             } else {
                 actualText.append(testFile.expectedText)
             }
         }
         KotlinTestUtils.assertEqualsToFile(file, actualText.toString())
     }
+
+    protected fun collectDebugInfoDiagnostics(
+        firFile: FirFile,
+        diagnosedRangesToDiagnosticNames: MutableMap<IntRange, MutableSet<String>>
+    ): List<FirDiagnostic<*>> {
+        val result = mutableListOf<FirDiagnostic<*>>()
+
+
+        object : FirDefaultVisitorVoid() {
+            override fun visitElement(element: FirElement) {
+                if (element is FirExpression) {
+                    result.addIfNotNull(
+                        createExpressionTypeDiagnosticIfExpected(
+                            element, diagnosedRangesToDiagnosticNames
+                        )
+                    )
+                }
+
+                element.acceptChildren(this)
+            }
+
+            override fun visitFunctionCall(functionCall: FirFunctionCall) {
+                result.addIfNotNull(
+                    createCallDiagnosticIfExpected(functionCall, functionCall.calleeReference, diagnosedRangesToDiagnosticNames)
+                )
+
+                super.visitFunctionCall(functionCall)
+            }
+        }.let(firFile::accept)
+
+        return result
+    }
+
+    fun createExpressionTypeDiagnosticIfExpected(
+        element: FirExpression,
+        diagnosedRangesToDiagnosticNames: MutableMap<IntRange, MutableSet<String>>
+    ): FirDiagnosticWithParameters1<FirSourceElement, String>? =
+        DebugInfoDiagnosticFactory1.EXPRESSION_TYPE.createDebugInfoDiagnostic(element, diagnosedRangesToDiagnosticNames) {
+            element.typeRef.renderAsString((element as? FirExpressionWithSmartcast)?.originalType)
+        }
+
+    private fun FirTypeRef.renderAsString(originalTypeRef: FirTypeRef?): String {
+        val type = coneTypeSafe<ConeKotlinType>() ?: return "Type is unknown"
+        val rendered = type.renderForDebugInfo()
+        val originalTypeRendered = originalTypeRef?.coneTypeSafe<ConeKotlinType>()?.renderForDebugInfo() ?: return rendered
+
+        return "$rendered & $originalTypeRendered"
+    }
+
+    private fun createCallDiagnosticIfExpected(
+        element: FirElement,
+        reference: FirNamedReference,
+        diagnosedRangesToDiagnosticNames: MutableMap<IntRange, MutableSet<String>>
+    ): FirDiagnosticWithParameters1<FirSourceElement, String>? =
+        DebugInfoDiagnosticFactory1.CALL.createDebugInfoDiagnostic(element, diagnosedRangesToDiagnosticNames) {
+
+            val resolvedSymbol = (reference as? FirResolvedNamedReference)?.resolvedSymbol
+            val fqName = resolvedSymbol?.fqNameUnsafe()
+            Renderers.renderCallInfo(fqName, getTypeOfCall(reference, resolvedSymbol))
+        }
+
+    private fun DebugInfoDiagnosticFactory1.createDebugInfoDiagnostic(
+        element: FirElement,
+        diagnosedRangesToDiagnosticNames: MutableMap<IntRange, MutableSet<String>>,
+        argument: () -> String,
+    ): FirDiagnosticWithParameters1<FirSourceElement, String>? {
+        val sourceElement = element.source ?: return null
+        if (diagnosedRangesToDiagnosticNames[sourceElement.startOffset..sourceElement.endOffset]?.contains(this.name) != true) return null
+
+        val argumentText = argument()
+        return when (sourceElement) {
+            is FirPsiSourceElement<*> -> FirPsiDiagnosticWithParameters1(
+                sourceElement,
+                argumentText,
+                severity,
+                FirDiagnosticFactory1(
+                    name,
+                    severity,
+                    this
+                )
+            )
+            is FirLightSourceElement -> FirLightDiagnosticWithParameters1(
+                sourceElement,
+                argumentText,
+                severity,
+                FirDiagnosticFactory1<FirSourceElement, PsiElement, String>(
+                    name,
+                    severity,
+                    this
+                )
+            )
+        }
+    }
+
+    private fun AbstractFirBasedSymbol<*>.fqNameUnsafe(): FqNameUnsafe? = when (this) {
+        is FirClassLikeSymbol<*> -> classId.asSingleFqName().toUnsafe()
+        is FirCallableSymbol<*> -> callableId.asFqNameForDebugInfo().toUnsafe()
+        else -> null
+    }
+
+    private fun getTypeOfCall(
+        reference: FirNamedReference,
+        resolvedSymbol: AbstractFirBasedSymbol<*>?
+    ): String {
+        if (resolvedSymbol == null) return TypeOfCall.UNRESOLVED.nameToRender
+
+        if ((resolvedSymbol as? FirFunctionSymbol)?.callableId?.callableName == OperatorNameConventions.INVOKE
+            && reference.name != OperatorNameConventions.INVOKE
+        ) {
+            return TypeOfCall.VARIABLE_THROUGH_INVOKE.nameToRender
+        }
+
+        return when (val fir = resolvedSymbol.fir) {
+            is FirProperty -> {
+                TypeOfCall.PROPERTY_GETTER.nameToRender
+            }
+            is FirFunction<*> -> buildString {
+                if (fir is FirCallableMemberDeclaration<*>) {
+                    if (fir.status.isInline) append("inline ")
+                    if (fir.status.isInfix) append("infix ")
+                    if (fir.status.isOperator) append("operator ")
+                    if (fir.receiverTypeRef != null) append("extension ")
+                }
+                append(TypeOfCall.FUNCTION.nameToRender)
+            }
+            else -> TypeOfCall.OTHER.nameToRender
+        }
+    }
+
 
     protected fun collectDiagnostics(firFiles: List<FirFile>): Map<FirFile, List<FirDiagnostic<*>>> {
         val collectors = mutableMapOf<FirSession, AbstractDiagnosticCollector>()

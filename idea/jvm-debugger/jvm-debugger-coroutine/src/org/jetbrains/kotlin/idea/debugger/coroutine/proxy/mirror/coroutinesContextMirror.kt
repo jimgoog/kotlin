@@ -8,41 +8,46 @@ package org.jetbrains.kotlin.idea.debugger.coroutine.proxy.mirror
 import com.sun.jdi.Method
 import com.sun.jdi.ObjectReference
 import org.jetbrains.kotlin.idea.debugger.evaluate.DefaultExecutionContext
+import java.lang.StackTraceElement
 
 class CoroutineContext(context: DefaultExecutionContext) :
-    BaseMirror<MirrorOfCoroutineContext>("kotlin.coroutines.CoroutineContext", context) {
+    BaseMirror<MirrorOfCoroutineContext>("kotlin.coroutines.CombinedContext", context) {
     val coroutineNameRef = CoroutineName(context)
     val coroutineIdRef = CoroutineId(context)
     val jobRef = Job(context)
-    val getContextElement: Method = makeMethod("get")
+    val dispatcherRef = CoroutineDispatcher(context)
+    val getContextElement = makeMethod("get")
 
     override fun fetchMirror(value: ObjectReference, context: DefaultExecutionContext): MirrorOfCoroutineContext? {
-        val coroutineName = getElementValue(value, context, coroutineNameRef) ?: "coroutine"
+        val coroutineName = getElementValue(value, context, coroutineNameRef)
         val coroutineId = getElementValue(value, context, coroutineIdRef)
         val job = getElementValue(value, context, jobRef)
-        return MirrorOfCoroutineContext(value, coroutineName, coroutineId, job)
+        val dispatcher = getElementValue(value, context, dispatcherRef)
+        return MirrorOfCoroutineContext(value, coroutineName, coroutineId, dispatcher, job)
     }
 
     fun <T> getElementValue(value: ObjectReference, context: DefaultExecutionContext, keyProvider: ContextKey<T>): T? {
-        val elementValue = objectValue(value, getContextElement, context, keyProvider.key()) ?: return null
+        val key = keyProvider.key() ?: return null
+        val elementValue = objectValue(value, getContextElement, context, key) ?: return null
         return keyProvider.mirror(elementValue, context)
     }
 }
 
 data class MirrorOfCoroutineContext(
     val that: ObjectReference,
-    val name: String,
+    val name: String?,
     val id: Long?,
+    val dispatcher: String?,
     val job: ObjectReference?
 )
 
 abstract class ContextKey<T>(name: String, context: DefaultExecutionContext) : BaseMirror<T>(name, context) {
-    abstract fun key() : ObjectReference
+    abstract fun key() : ObjectReference?
 }
 
 class CoroutineName(context: DefaultExecutionContext) : ContextKey<String>("kotlinx.coroutines.CoroutineName", context) {
     val key = staticObjectValue("Key")
-    val getNameRef: Method = makeMethod("getName")
+    val getNameRef = makeMethod("getName")
 
     override fun fetchMirror(value: ObjectReference, context: DefaultExecutionContext): String? {
         return stringValue(value, getNameRef, context)
@@ -53,7 +58,7 @@ class CoroutineName(context: DefaultExecutionContext) : ContextKey<String>("kotl
 
 class CoroutineId(context: DefaultExecutionContext) : ContextKey<Long>("kotlinx.coroutines.CoroutineId", context) {
     val key = staticObjectValue("Key")
-    val getIdRef: Method = makeMethod("getId")
+    val getIdRef = makeMethod("getId")
 
     override fun fetchMirror(value: ObjectReference, context: DefaultExecutionContext): Long? {
         return longValue(value, getIdRef, context)
@@ -62,11 +67,23 @@ class CoroutineId(context: DefaultExecutionContext) : ContextKey<Long>("kotlinx.
     override fun key() = key
 }
 
-class Job(context: DefaultExecutionContext) : ContextKey<ObjectReference>("kotlinx.coroutines.Job", context) {
-    val key = staticObjectValue("Key")
+class Job(context: DefaultExecutionContext) : ContextKey<ObjectReference>("kotlinx.coroutines.Job\$Key", context) {
+    val key = staticObjectValue("\$\$INSTANCE")
 
     override fun fetchMirror(value: ObjectReference, context: DefaultExecutionContext): ObjectReference? {
         return value
+    }
+
+    override fun key() = key
+}
+
+
+class CoroutineDispatcher(context: DefaultExecutionContext) : ContextKey<String>("kotlinx.coroutines.CoroutineDispatcher", context) {
+    val key = staticObjectValue("Key")
+    val jlm = JavaLangMirror(context)
+
+    override fun fetchMirror(value: ObjectReference, context: DefaultExecutionContext): String? {
+        return jlm.string(value, context)
     }
 
     override fun key() = key
