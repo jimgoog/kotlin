@@ -32,6 +32,7 @@ import org.jetbrains.kotlin.backend.common.output.OutputFileCollection
 import org.jetbrains.kotlin.backend.common.output.SimpleOutputFileCollection
 import org.jetbrains.kotlin.backend.common.phaser.PhaseConfig
 import org.jetbrains.kotlin.backend.common.serialization.signature.IdSignatureDescriptor
+import org.jetbrains.kotlin.backend.jvm.JvmGeneratorExtensions
 import org.jetbrains.kotlin.backend.jvm.JvmIrCodegenFactory
 import org.jetbrains.kotlin.backend.jvm.jvmPhases
 import org.jetbrains.kotlin.cli.common.CLIConfigurationKeys
@@ -51,7 +52,11 @@ import org.jetbrains.kotlin.config.*
 import org.jetbrains.kotlin.fileClasses.JvmFileClassUtil
 import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.backend.Fir2IrConverter
+import org.jetbrains.kotlin.fir.backend.jvm.FirJvmClassCodegen
 import org.jetbrains.kotlin.fir.builder.RawFirBuilder
+import org.jetbrains.kotlin.fir.extensions.FirExtensionRegistrar
+import org.jetbrains.kotlin.fir.extensions.extensionsService
+import org.jetbrains.kotlin.fir.extensions.registerExtensions
 import org.jetbrains.kotlin.fir.java.FirJavaModuleBasedSession
 import org.jetbrains.kotlin.fir.java.FirLibrarySession
 import org.jetbrains.kotlin.fir.java.FirProjectSessionProvider
@@ -76,7 +81,6 @@ import org.jetbrains.kotlin.resolve.jvm.KotlinJavaPsiFacade
 import org.jetbrains.kotlin.resolve.jvm.platform.JvmPlatformAnalyzerServices
 import org.jetbrains.kotlin.utils.newLinkedHashMapWithExpectedSize
 import java.io.File
-import java.net.URLClassLoader
 
 object KotlinToJVMBytecodeCompiler {
     private fun writeOutput(
@@ -323,7 +327,7 @@ object KotlinToJVMBytecodeCompiler {
                     dependenciesInfo, provider, librariesScope,
                     project, environment.createPackagePartProvider(librariesScope)
                 )
-
+                it.extensionsService.registerExtensions(FirExtensionRegistrar.RegisteredExtensions.EMPTY)
             }
             val firProvider = (session.firProvider as FirProviderImpl)
             val builder = RawFirBuilder(session, firProvider.kotlinScopeProvider, stubMode = false)
@@ -345,7 +349,8 @@ object KotlinToJVMBytecodeCompiler {
             val (moduleFragment, symbolTable, sourceManager) =
                 Fir2IrConverter.createModuleFragment(
                     session, resolveTransformer.scopeSession, firFiles,
-                    moduleConfiguration.languageVersionSettings, signaturer = signaturer
+                    moduleConfiguration.languageVersionSettings, signaturer = signaturer,
+                    generatorExtensions = JvmGeneratorExtensions(generateFacades = false)
                 )
             val dummyBindingContext = NoScopeRecordCliBindingTrace().bindingContext
 
@@ -369,7 +374,11 @@ object KotlinToJVMBytecodeCompiler {
             val performanceManager = environment.configuration.get(CLIConfigurationKeys.PERF_MANAGER)
             performanceManager?.notifyGenerationStarted()
             generationState.beforeCompile()
-            codegenFactory.generateModuleInFrontendIRMode(generationState, moduleFragment, symbolTable, sourceManager)
+            codegenFactory.generateModuleInFrontendIRMode(
+                generationState, moduleFragment, symbolTable, sourceManager
+            ) { irClass, context, parentFunction ->
+                FirJvmClassCodegen(irClass, context, parentFunction, session)
+            }
             CodegenFactory.doCheckCancelled(generationState)
             generationState.factory.done()
             performanceManager?.notifyGenerationFinished(

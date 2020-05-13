@@ -75,8 +75,8 @@ private val arrayConstructorPhase = makeIrFilePhase(
     description = "Transform `Array(size) { index -> value }` into a loop"
 )
 
-private val expectDeclarationsRemovingPhase = makeIrModulePhase<JvmBackendContext>(
-    { context -> ExpectDeclarationsRemoveLowering(context, keepOptionalAnnotations = true) },
+private val expectDeclarationsRemovingPhase = makeIrModulePhase(
+    ::ExpectDeclarationsRemoveLowering,
     name = "ExpectDeclarationsRemoving",
     description = "Remove expect declaration from module fragment"
 )
@@ -270,7 +270,6 @@ private val kotlinNothingValueExceptionPhase = makeIrFilePhase(
 
 @Suppress("Reformat")
 private val jvmFilePhases =
-        renameAnonymousParametersLowering then
         typeAliasAnnotationMethodsPhase then
         stripTypeAliasDeclarationsPhase then
         provisionalFunctionExpressionPhase then
@@ -376,6 +375,7 @@ val jvmPhases = namedIrModulePhase(
     name = "IrLowering",
     description = "IR lowering",
     lower = validateIrBeforeLowering then
+            processOptionalAnnotationsPhase then
             expectDeclarationsRemovingPhase then
             fileClassPhase then
             performByIrFile(lower = jvmFilePhases) then

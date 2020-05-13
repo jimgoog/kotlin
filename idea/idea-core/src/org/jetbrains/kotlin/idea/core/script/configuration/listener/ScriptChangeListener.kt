@@ -9,7 +9,6 @@ import com.intellij.openapi.extensions.ExtensionPointName
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiManager
-import org.jetbrains.kotlin.idea.core.script.configuration.DefaultScriptConfigurationManager
 import org.jetbrains.kotlin.idea.util.ProjectRootsUtil
 import org.jetbrains.kotlin.idea.util.application.runReadAction
 import org.jetbrains.kotlin.psi.KtFile
@@ -28,10 +27,9 @@ abstract class ScriptChangeListener(protected val project: Project) {
     abstract fun isApplicable(vFile: VirtualFile): Boolean
 
     protected fun getAnalyzableKtFileForScript(vFile: VirtualFile): KtFile? {
-        if (project.isDisposed) return null
-        if (!vFile.isValid) return null
-
         return runReadAction {
+            if (project.isDisposed) return@runReadAction null
+            if (!vFile.isValid) return@runReadAction null
             (PsiManager.getInstance(project).findFile(vFile) as? KtFile)?.takeIf {
                 ProjectRootsUtil.isInProjectSource(it, includeScriptsOutsideSourceRoots = true)
             }

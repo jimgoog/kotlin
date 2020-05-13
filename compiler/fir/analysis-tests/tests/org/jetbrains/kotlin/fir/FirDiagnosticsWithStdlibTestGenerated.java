@@ -233,6 +233,11 @@ public class FirDiagnosticsWithStdlibTestGenerated extends AbstractFirDiagnostic
         runTest("compiler/fir/analysis-tests/testData/resolveWithStdlib/simpleLazy.kt");
     }
 
+    @TestMetadata("stringConstructors.kt")
+    public void testStringConstructors() throws Exception {
+        runTest("compiler/fir/analysis-tests/testData/resolveWithStdlib/stringConstructors.kt");
+    }
+
     @TestMetadata("toSortedMapWithComparator.kt")
     public void testToSortedMapWithComparator() throws Exception {
         runTest("compiler/fir/analysis-tests/testData/resolveWithStdlib/toSortedMapWithComparator.kt");
@@ -718,6 +723,11 @@ public class FirDiagnosticsWithStdlibTestGenerated extends AbstractFirDiagnostic
         @TestMetadata("FieldSubstitution.kt")
         public void testFieldSubstitution() throws Exception {
             runTest("compiler/fir/analysis-tests/testData/resolveWithStdlib/j+k/FieldSubstitution.kt");
+        }
+
+        @TestMetadata("FlexiblePrimitiveOverloading.kt")
+        public void testFlexiblePrimitiveOverloading() throws Exception {
+            runTest("compiler/fir/analysis-tests/testData/resolveWithStdlib/j+k/FlexiblePrimitiveOverloading.kt");
         }
 
         @TestMetadata("flexibleTypeAliases.kt")

@@ -10,6 +10,8 @@ import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.FirSourceElement
 import org.jetbrains.kotlin.fir.builder.FirAnnotationContainerBuilder
 import org.jetbrains.kotlin.fir.builder.FirBuilderDsl
+import org.jetbrains.kotlin.fir.declarations.FirDeclarationAttributes
+import org.jetbrains.kotlin.fir.declarations.FirDeclarationOrigin
 import org.jetbrains.kotlin.fir.declarations.FirDeclarationStatus
 import org.jetbrains.kotlin.fir.declarations.FirEnumEntry
 import org.jetbrains.kotlin.fir.declarations.FirPropertyAccessor
@@ -35,6 +37,7 @@ class FirEnumEntryBuilder : FirAnnotationContainerBuilder {
     override var source: FirSourceElement? = null
     lateinit var session: FirSession
     var resolvePhase: FirResolvePhase = FirResolvePhase.RAW_FIR
+    lateinit var origin: FirDeclarationOrigin
     lateinit var returnTypeRef: FirTypeRef
     lateinit var name: Name
     lateinit var symbol: FirVariableSymbol<FirEnumEntry>
@@ -49,6 +52,7 @@ class FirEnumEntryBuilder : FirAnnotationContainerBuilder {
             source,
             session,
             resolvePhase,
+            origin,
             returnTypeRef,
             name,
             symbol,

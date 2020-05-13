@@ -6,6 +6,7 @@ import org.jetbrains.kotlin.tools.projectWizard.SettingsOwner
 import org.jetbrains.kotlin.tools.projectWizard.core.*
 import org.jetbrains.kotlin.tools.projectWizard.core.entity.settings.*
 import org.jetbrains.kotlin.tools.projectWizard.enumSettingImpl
+import org.jetbrains.kotlin.tools.projectWizard.ir.buildsystem.BuildFileIR
 import org.jetbrains.kotlin.tools.projectWizard.ir.buildsystem.BuildSystemIR
 import org.jetbrains.kotlin.tools.projectWizard.ir.buildsystem.KotlinBuildSystemPluginIR
 import org.jetbrains.kotlin.tools.projectWizard.ir.buildsystem.StdlibType
@@ -212,12 +213,17 @@ interface ModuleConfigurator : DisplayableSettingItem, EntitiesOwnerDescriptor {
     val canContainSubModules: Boolean get() = false
     val requiresRootBuildFile: Boolean get() = false
 
+    val kotlinDirectoryName: String get() = Defaults.KOTLIN_DIR.toString()
+    val resourcesDirectoryName: String get() = Defaults.RESOURCES_DIR.toString()
+
     fun createBuildFileIRs(
         reader: Reader,
         configurationData: ModulesToIrConversionData,
         module: Module
     ): List<BuildSystemIR> =
         emptyList()
+
+    fun createBuildFileIRsComparator(): Comparator<BuildSystemIR>? = null
 
     fun createModuleIRs(
         reader: Reader,

@@ -9,6 +9,7 @@ where advanced options include:
   -Xir-dce-driven            Perform a more experimental faster dead code elimination
   -Xir-dce-print-reachability-info
                              Print declarations' reachability info to stdout during performing DCE
+  -Xir-module-name=<name>    Specify a compilation module name for IR backend
   -Xir-only                  Disables pre-IR backend
   -Xir-produce-js            Generates JS file using IR backend. Also disables pre-IR backend
   -Xir-produce-klib-dir      Generate unpacked KLIB into parent directory of output JS file.
@@ -61,7 +62,8 @@ where advanced options include:
   -Xread-deserialized-contracts Enable reading of contracts from metadata
   -Xreport-output-files      Report source to output files mapping
   -Xreport-perf              Report detailed performance statistics
-  -Xskip-metadata-version-check Load classes with bad metadata version anyway (incl. pre-release classes)
+  -Xskip-metadata-version-check Allow to load classes with bad metadata version and pre-release classes
+  -Xskip-prerelease-check    Allow to load pre-release classes
   -Xuse-experimental=<fq.name> Enable, but don't propagate usages of experimental API for marker annotation with the given fully qualified name
   -Xuse-fir                  Compile using Front-end IR. Warning: this feature is far from being production-ready
   -Xuse-mixed-named-arguments Enable Support named arguments in their own position even if the result appears as mixed

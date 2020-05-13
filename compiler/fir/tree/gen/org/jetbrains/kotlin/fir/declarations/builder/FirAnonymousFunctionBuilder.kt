@@ -13,6 +13,8 @@ import org.jetbrains.kotlin.fir.FirSourceElement
 import org.jetbrains.kotlin.fir.builder.FirAnnotationContainerBuilder
 import org.jetbrains.kotlin.fir.builder.FirBuilderDsl
 import org.jetbrains.kotlin.fir.declarations.FirAnonymousFunction
+import org.jetbrains.kotlin.fir.declarations.FirDeclarationAttributes
+import org.jetbrains.kotlin.fir.declarations.FirDeclarationOrigin
 import org.jetbrains.kotlin.fir.declarations.FirResolvePhase
 import org.jetbrains.kotlin.fir.declarations.FirTypeParameter
 import org.jetbrains.kotlin.fir.declarations.FirValueParameter
@@ -37,6 +39,7 @@ import org.jetbrains.kotlin.fir.visitors.*
 class FirAnonymousFunctionBuilder : FirFunctionBuilder, FirAnnotationContainerBuilder, FirExpressionBuilder {
     override var source: FirSourceElement? = null
     override lateinit var session: FirSession
+    override lateinit var origin: FirDeclarationOrigin
     override val annotations: MutableList<FirAnnotationCall> = mutableListOf()
     override lateinit var returnTypeRef: FirTypeRef
     var receiverTypeRef: FirTypeRef? = null
@@ -54,6 +57,7 @@ class FirAnonymousFunctionBuilder : FirFunctionBuilder, FirAnnotationContainerBu
         return FirAnonymousFunctionImpl(
             source,
             session,
+            origin,
             annotations,
             returnTypeRef,
             receiverTypeRef,

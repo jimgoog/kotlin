@@ -12,6 +12,7 @@ import org.jetbrains.kotlin.fir.declarations.impl.FirDefaultPropertyGetter
 import org.jetbrains.kotlin.fir.declarations.impl.FirDefaultPropertySetter
 import org.jetbrains.kotlin.fir.expressions.FirDelegatedConstructorCall
 import org.jetbrains.kotlin.fir.expressions.FirExpression
+import org.jetbrains.kotlin.fir.expressions.impl.FirNoReceiverExpression
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference
 import org.jetbrains.kotlin.fir.symbols.impl.FirConstructorSymbol
 import org.jetbrains.kotlin.fir.types.*
@@ -33,7 +34,7 @@ internal class ClassMemberGenerator(
 ) : Fir2IrComponents by components {
 
     private val fakeOverrideGenerator = FakeOverrideGenerator(
-        session, components.scopeSession, declarationStorage, conversionScope, fakeOverrideMode
+        session, components.scopeSession, classifierStorage, declarationStorage, conversionScope, fakeOverrideMode
     )
 
     private fun FirTypeRef.toIrType(): IrType = with(typeConverter) { toIrType() }
@@ -64,8 +65,11 @@ internal class ClassMemberGenerator(
             }
             // Add synthetic members *before* fake override generations.
             // Otherwise, redundant members, e.g., synthetic toString _and_ fake override toString, will be added.
+            if (irClass.isInline && klass.getPrimaryConstructorIfAny() != null) {
+                processedCallableNames += DataClassMembersGenerator(components).generateInlineClassMembers(klass, irClass)
+            }
             if (irClass.isData && klass.getPrimaryConstructorIfAny() != null) {
-                processedCallableNames += DataClassMembersGenerator(components).generateDataClassMembers(irClass)
+                processedCallableNames += DataClassMembersGenerator(components).generateDataClassMembers(klass, irClass)
             }
             with(fakeOverrideGenerator) { irClass.addFakeOverrides(klass, processedCallableNames) }
             klass.declarations.forEach {
@@ -97,6 +101,12 @@ internal class ClassMemberGenerator(
                 }
                 for ((valueParameter, firValueParameter) in valueParameters.zip(firFunction.valueParameters)) {
                     valueParameter.setDefaultValue(firValueParameter)
+                    valueParameter.annotations = firValueParameter.annotations.mapNotNull {
+                        it.accept(visitor, null) as? IrConstructorCall
+                    }
+                }
+                annotations = firFunction.annotations.mapNotNull {
+                    it.accept(visitor, null) as? IrConstructorCall
                 }
             }
             if (firFunction is FirConstructor && irFunction is IrConstructor && !parentAsClass.isAnnotationClass) {
@@ -126,11 +136,12 @@ internal class ClassMemberGenerator(
                         irFunction.body = IrSyntheticBodyImpl(startOffset, endOffset, kind)
                     }
                     irFunction.parent is IrClass && irFunction.parentAsClass.isData -> {
+                        val classId = firFunction?.symbol?.callableId?.classId
                         when {
                             DataClassMembersGenerator.isComponentN(irFunction) ->
-                                DataClassMembersGenerator(components).generateDataClassComponentBody(irFunction)
+                                DataClassMembersGenerator(components).generateDataClassComponentBody(irFunction, classId!!)
                             DataClassMembersGenerator.isCopy(irFunction) ->
-                                DataClassMembersGenerator(components).generateDataClassCopyBody(irFunction)
+                                DataClassMembersGenerator(components).generateDataClassCopyBody(irFunction, classId!!)
                             else ->
                                 irFunction.body = firFunction?.body?.let { visitor.convertToIrBlockBody(it) }
                         }
@@ -237,6 +248,7 @@ internal class ClassMemberGenerator(
                     startOffset, endOffset, constructedIrType, "Cannot find delegated constructor call"
                 )
             }
+        val firDispatchReceiver = dispatchReceiver
         return convertWithOffsets { startOffset, endOffset ->
             val irConstructorSymbol = declarationStorage.getIrFunctionSymbol(constructorSymbol) as IrConstructorSymbol
             if (constructorSymbol.fir.isFromEnumClass || constructorSymbol.fir.returnTypeRef.isEnum) {
@@ -258,6 +270,9 @@ internal class ClassMemberGenerator(
                     irConstructorSymbol
                 )
             }.let {
+                if (firDispatchReceiver !is FirNoReceiverExpression) {
+                    it.dispatchReceiver = visitor.convertToIrExpression(firDispatchReceiver)
+                }
                 with(callGenerator) {
                     it.applyCallArguments(this@toIrDelegatingConstructorCall)
                 }

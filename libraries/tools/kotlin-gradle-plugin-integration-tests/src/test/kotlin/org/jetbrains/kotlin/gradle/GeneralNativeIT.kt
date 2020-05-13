@@ -10,6 +10,9 @@ import org.junit.Test
 
 class GeneralNativeIT : BaseGradleIT() {
 
+    override val defaultGradleVersion: GradleVersionRequired
+        get() = GradleVersionRequired.FOR_MPP_SUPPORT
+
     @Test
     fun testParallelExecutionDetection(): Unit = with(transformProjectWithPluginsDsl("native-parallel")) {
         val compileTasks = arrayOf(":one:compileKotlinLinux", ":two:compileKotlinLinux")
@@ -51,6 +54,7 @@ class GeneralNativeIT : BaseGradleIT() {
             assertTasksExecuted(":two:compileKotlinLinux")
             assertNotContains("Parallel in-process execution of the Kotlin/Native compiler detected.")
         }
-
     }
+
+    // TODO: Move native specific tests from NewMultiplatformIT here.
 }

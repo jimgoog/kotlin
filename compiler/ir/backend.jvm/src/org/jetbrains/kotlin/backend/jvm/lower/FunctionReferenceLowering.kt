@@ -124,30 +124,43 @@ internal class FunctionReferenceLowering(private val context: JvmBackendContext)
         private val useOptimizedSuperClass =
             context.state.generateOptimizedCallableReferenceSuperClasses
 
-        private val adaptedReferenceOriginalTarget = if (callee.origin == IrDeclarationOrigin.ADAPTER_FOR_CALLABLE_REFERENCE) {
-            // The body of a callable reference adapter contains either only a call, or an IMPLICIT_COERCION_TO_UNIT type operator
-            // applied to a call. That call's target is the original function which we need to get owner/name/signature.
-            val call = when (val statement = callee.body!!.statements.single()) {
-                is IrTypeOperatorCall -> {
-                    assert(statement.operator == IrTypeOperator.IMPLICIT_COERCION_TO_UNIT) {
-                        "Unexpected type operator in ADAPTER_FOR_CALLABLE_REFERENCE: ${callee.render()}"
+        private val adapteeCall: IrFunctionAccessExpression? =
+            if (callee.origin == IrDeclarationOrigin.ADAPTER_FOR_CALLABLE_REFERENCE) {
+                // The body of a callable reference adapter contains either only a call, or an IMPLICIT_COERCION_TO_UNIT type operator
+                // applied to a call. That call's target is the original function which we need to get owner/name/signature.
+                val call = when (val statement = callee.body!!.statements.single()) {
+                    is IrTypeOperatorCall -> {
+                        assert(statement.operator == IrTypeOperator.IMPLICIT_COERCION_TO_UNIT) {
+                            "Unexpected type operator in ADAPTER_FOR_CALLABLE_REFERENCE: ${callee.render()}"
+                        }
+                        statement.argument
                     }
-                    statement.argument
+                    is IrReturn -> statement.value
+                    else -> statement
                 }
-                is IrReturn -> statement.value
-                else -> statement
+                if (call !is IrFunctionAccessExpression) {
+                    throw UnsupportedOperationException("Unknown structure of ADAPTER_FOR_CALLABLE_REFERENCE: ${callee.render()}")
+                }
+                call
+            } else {
+                null
             }
-            if (call !is IrFunctionAccessExpression) {
-                throw UnsupportedOperationException("Unknown structure of ADAPTER_FOR_CALLABLE_REFERENCE: ${callee.render()}")
-            }
-            call.symbol.owner
-        } else null
+
+        private val adaptedReferenceOriginalTarget: IrFunction? = adapteeCall?.symbol?.owner
+        private val isAdaptedReference = adaptedReferenceOriginalTarget != null
+
+        private val needToGenerateSamEqualsHashCodeMethods =
+            samSuperType != null &&
+                    samSuperType.getClass()?.origin != IrDeclarationOrigin.IR_EXTERNAL_JAVA_DECLARATION_STUB &&
+                    (isAdaptedReference || !isLambda)
 
         private val superType =
             samSuperType ?: when {
-                adaptedReferenceOriginalTarget != null -> context.ir.symbols.adaptedFunctionReference
                 isLambda -> context.ir.symbols.lambdaClass
-                useOptimizedSuperClass -> context.ir.symbols.functionReferenceImpl
+                useOptimizedSuperClass -> when {
+                    isAdaptedReference -> context.ir.symbols.adaptedFunctionReference
+                    else -> context.ir.symbols.functionReferenceImpl
+                }
                 else -> context.ir.symbols.functionReference
             }.defaultType
 
@@ -160,10 +173,18 @@ internal class FunctionReferenceLowering(private val context: JvmBackendContext)
             name = SpecialNames.NO_NAME_PROVIDED
         }.apply {
             parent = currentDeclarationParent ?: error("No current declaration parent at ${irFunctionReference.dump()}")
-            superTypes += superType
-            if (samSuperType == null)
-                superTypes += functionSuperClass.typeWith(parameterTypes)
-            if (irFunctionReference.isSuspend) superTypes += context.ir.symbols.suspendFunctionInterface.defaultType
+            superTypes = listOfNotNull(
+                superType,
+                if (samSuperType == null)
+                    functionSuperClass.typeWith(parameterTypes)
+                else null,
+                if (irFunctionReference.isSuspend)
+                    context.ir.symbols.suspendFunctionInterface.defaultType
+                else null,
+                if (needToGenerateSamEqualsHashCodeMethods)
+                    context.ir.symbols.functionAdapter.defaultType
+                else null,
+            )
             createImplicitParameterDeclarationWithWrappedDescriptor()
             copyAttributes(irFunctionReference)
             if (isLambda) {
@@ -186,11 +207,11 @@ internal class FunctionReferenceLowering(private val context: JvmBackendContext)
         fun build(): IrExpression = context.createJvmIrBuilder(currentScope!!.scope.scopeOwnerSymbol).run {
             irBlock(irFunctionReference.startOffset, irFunctionReference.endOffset) {
                 val constructor = createConstructor()
-                createInvokeMethod(
+                val boundReceiverVar =
                     if (samSuperType != null && boundReceiver != null) {
                         irTemporary(boundReceiver.second)
                     } else null
-                )
+                createInvokeMethod(boundReceiverVar)
 
                 if (!isLambda && samSuperType == null && !useOptimizedSuperClass) {
                     createLegacyMethodOverride(irSymbols.functionReferenceGetSignature.owner) {
@@ -204,11 +225,49 @@ internal class FunctionReferenceLowering(private val context: JvmBackendContext)
                     }
                 }
 
+                if (needToGenerateSamEqualsHashCodeMethods) {
+                    generateSamEqualsHashCodeMethods(boundReceiverVar)
+                }
+
                 +functionReferenceClass
                 +irCall(constructor.symbol).apply {
                     if (valueArgumentsCount > 0) putValueArgument(0, boundReceiver!!.second)
                 }
             }
+        }
+
+        private fun JvmIrBuilder.generateSamEqualsHashCodeMethods(boundReceiverVar: IrVariable?) {
+            checkNotNull(samSuperType) { "equals/hashCode can only be generated for fun interface wrappers: ${callee.render()}" }
+
+            if (!useOptimizedSuperClass) {
+                // This is the case of a fun interface wrapper over a (maybe adapted) function reference,
+                // with `-Xno-optimized-callable-referenced` enabled. We can't use constructors of FunctionReferenceImpl,
+                // so we'd need to basically generate a full class for a reference inheriting from FunctionReference,
+                // effectively disabling the optimization of fun interface wrappers over references.
+                // This scenario is probably not very popular because it involves using equals/hashCode on function references
+                // and enabling the mentioned internal compiler argument.
+                // Right now we generate them as abstract so that any call would result in AbstractMethodError.
+                // TODO: generate getFunctionDelegate, equals and hashCode properly in this case
+                functionReferenceClass.addFunction("equals", backendContext.irBuiltIns.booleanType, Modality.ABSTRACT).apply {
+                    addValueParameter("other", backendContext.irBuiltIns.anyNType)
+                }
+                functionReferenceClass.addFunction("hashCode", backendContext.irBuiltIns.intType, Modality.ABSTRACT)
+                return
+            }
+
+            SamEqualsHashCodeMethodsGenerator(backendContext, functionReferenceClass, samSuperType) { receiver ->
+                val internalClass = when {
+                    isAdaptedReference -> backendContext.ir.symbols.adaptedFunctionReference
+                    else -> backendContext.ir.symbols.functionReferenceImpl
+                }
+                val constructor = internalClass.owner.constructors.single {
+                    // arity, [receiver], owner, name, signature, flags
+                    it.valueParameters.size == 1 + (if (boundReceiver != null) 1 else 0) + 4
+                }
+                irCallConstructor(constructor.symbol, emptyList()).apply {
+                    generateConstructorCallArguments(this) { irGet(boundReceiverVar!!) }
+                }
+            }.generate()
         }
 
         private fun createConstructor(): IrConstructor =
@@ -238,11 +297,9 @@ internal class FunctionReferenceLowering(private val context: JvmBackendContext)
                 val constructor = if (samSuperType != null) {
                     context.irBuiltIns.anyClass.owner.constructors.single()
                 } else {
-                    val expectedArity = when {
-                        adaptedReferenceOriginalTarget != null -> 5 + (if (boundReceiver != null) 1 else 0)
-                        isLambda -> 1
-                        else -> 1 + (if (boundReceiver != null) 1 else 0) + (if (useOptimizedSuperClass) 4 else 0)
-                    }
+                    val expectedArity =
+                        if (isLambda && !isAdaptedReference) 1
+                        else 1 + (if (boundReceiver != null) 1 else 0) + (if (useOptimizedSuperClass) 4 else 0)
                     superType.getClass()!!.constructors.single {
                         it.valueParameters.size == expectedArity
                     }
@@ -250,34 +307,64 @@ internal class FunctionReferenceLowering(private val context: JvmBackendContext)
 
                 body = context.createJvmIrBuilder(symbol).run {
                     irBlockBody(startOffset, endOffset) {
-                        +irDelegatingConstructorCall(constructor).apply {
+                        +irDelegatingConstructorCall(constructor).also { call ->
                             if (samSuperType == null) {
-                                var index = 0
-                                putValueArgument(index++, irInt(argumentTypes.size + if (irFunctionReference.isSuspend) 1 else 0))
-                                if (boundReceiver != null) {
-                                    putValueArgument(index++, irGet(valueParameters.first()))
-                                }
-                                val callableReferenceTarget = when {
-                                    adaptedReferenceOriginalTarget != null -> adaptedReferenceOriginalTarget
-                                    !isLambda && useOptimizedSuperClass -> callee
-                                    else -> null
-                                }
-                                if (callableReferenceTarget != null) {
-                                    val owner = calculateOwnerKClass(callableReferenceTarget.parent, backendContext)
-                                    putValueArgument(index++, kClassToJavaClass(owner, backendContext))
-                                    putValueArgument(index++, irString(callableReferenceTarget.originalName.asString()))
-                                    putValueArgument(index++, generateSignature(callableReferenceTarget.symbol))
-                                    putValueArgument(
-                                        index,
-                                        irInt(if (callableReferenceTarget.parent.let { it is IrClass && it.isFileClass }) 1 else 0)
-                                    )
-                                }
+                                generateConstructorCallArguments(call) { irGet(valueParameters.first()) }
                             }
                         }
                         +IrInstanceInitializerCallImpl(startOffset, endOffset, functionReferenceClass.symbol, context.irBuiltIns.unitType)
                     }
                 }
             }
+
+        private fun JvmIrBuilder.generateConstructorCallArguments(
+            call: IrFunctionAccessExpression,
+            generateBoundReceiver: IrBuilder.() -> IrExpression
+        ) {
+            var index = 0
+            call.putValueArgument(index++, irInt(argumentTypes.size + if (irFunctionReference.isSuspend) 1 else 0))
+            if (boundReceiver != null) {
+                call.putValueArgument(index++, generateBoundReceiver())
+            }
+            if (!isLambda && useOptimizedSuperClass) {
+                val callableReferenceTarget = adaptedReferenceOriginalTarget ?: callee
+                val owner = calculateOwnerKClass(callableReferenceTarget.parent, backendContext)
+                call.putValueArgument(index++, kClassToJavaClass(owner, backendContext))
+                call.putValueArgument(index++, irString(callableReferenceTarget.originalName.asString()))
+                call.putValueArgument(index++, generateSignature(callableReferenceTarget.symbol))
+                call.putValueArgument(index, irInt(getFunctionReferenceFlags(callableReferenceTarget)))
+            }
+        }
+
+        private fun getFunctionReferenceFlags(callableReferenceTarget: IrFunction): Int {
+            val isTopLevelBit = if (callableReferenceTarget.parent.let { it is IrClass && it.isFileClass }) 1 else 0
+            val adaptedCallableReferenceFlags = getAdaptedCallableReferenceFlags()
+            return isTopLevelBit + (adaptedCallableReferenceFlags shl 1)
+        }
+
+        private fun getAdaptedCallableReferenceFlags(): Int {
+            if (adaptedReferenceOriginalTarget == null) return 0
+
+            val isVarargMappedToElementBit = if (hasVarargMappedToElement()) 1 else 0
+            val isSuspendConvertedBit = if (!adaptedReferenceOriginalTarget.isSuspend && callee.isSuspend) 1 else 0
+            val isCoercedToUnitBit = if (!adaptedReferenceOriginalTarget.returnType.isUnit() && callee.returnType.isUnit()) 1 else 0
+
+            return isVarargMappedToElementBit +
+                    (isSuspendConvertedBit shl 1) +
+                    (isCoercedToUnitBit shl 2)
+        }
+
+        private fun hasVarargMappedToElement(): Boolean {
+            if (adapteeCall == null) return false
+            for (i in 0 until adapteeCall.valueArgumentsCount) {
+                val arg = adapteeCall.getValueArgument(i) ?: continue
+                if (arg !is IrVararg) continue
+                for (varargElement in arg.elements) {
+                    if (varargElement is IrGetValue) return true
+                }
+            }
+            return false
+        }
 
         private fun createInvokeMethod(receiverVar: IrValueDeclaration?): IrSimpleFunction =
             functionReferenceClass.addFunction {

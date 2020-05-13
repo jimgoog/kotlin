@@ -99,7 +99,7 @@ class Fir2IrTypeConverter(
                 intersectedTypes.first().toIrType(typeContext)
             }
             is ConeStubType -> createErrorType()
-            is ConeIntegerLiteralType -> getApproximatedType().toIrType(typeContext)
+            is ConeIntegerLiteralType -> createErrorType()
         }
     }
 
@@ -132,3 +132,11 @@ class Fir2IrTypeConverter(
         return classIdToSymbolMap[classId] ?: getArrayClassSymbol(classId)
     }
 }
+
+fun FirTypeRef.toIrType(
+    typeConverter: Fir2IrTypeConverter,
+    typeContext: ConversionTypeContext = ConversionTypeContext.DEFAULT
+): IrType =
+    with(typeConverter) {
+        toIrType(typeContext)
+    }

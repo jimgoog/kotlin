@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2020 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -47,12 +47,15 @@ constructor(
             check(!isBrowserConfigured && !isNodejsConfigured) {
                 "Please set moduleName before initialize browser() or nodejs()"
             }
-            irTarget?.moduleName = value
             field = value
         }
 
     val disambiguationClassifierInPlatform: String?
-        get() = disambiguationClassifier?.removeJsCompilerSuffix(KotlinJsCompilerType.LEGACY)
+        get() = if (irTarget != null) {
+            disambiguationClassifier?.removeJsCompilerSuffix(KotlinJsCompilerType.LEGACY)
+        } else {
+            disambiguationClassifier
+        }
 
     override val kotlinComponents: Set<KotlinTargetComponent> by lazy {
         if (irTarget == null)

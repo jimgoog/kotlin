@@ -97,8 +97,15 @@ class KotlinNativeCompilation(
         get() = compileKotlinTask.kotlinOptions
 }
 
-class KotlinSharedNativeCompilation(override val target: KotlinMetadataTarget, name: String) :
-    AbstractKotlinNativeCompilation(target, HostManager.host, name),
+class KotlinSharedNativeCompilation(override val target: KotlinMetadataTarget, val konanTargets: List<KonanTarget>, name: String) :
+    AbstractKotlinNativeCompilation(
+        target,
+        // TODO: this will end up as '-target' argument passed to K2Native, which is wrong.
+        // Rewrite this when we'll compile native-shared source-sets against commonized platform libs
+        // We find any konan target that is enabled on the current host in order to pass the checks that avoid compiling the code otherwise.
+        konanTargets.find { it.enabledOnCurrentHost } ?: konanTargets.first(),
+        name
+    ),
     KotlinMetadataCompilation<KotlinCommonOptions> {
 
     override val friendArtifacts: FileCollection

@@ -25,6 +25,7 @@ import org.jetbrains.kotlin.TestsCompiletimeError
 import org.jetbrains.kotlin.asJava.finder.JavaElementFinder
 import org.jetbrains.kotlin.backend.common.phaser.PhaseConfig
 import org.jetbrains.kotlin.backend.common.serialization.signature.IdSignatureDescriptor
+import org.jetbrains.kotlin.backend.jvm.JvmGeneratorExtensions
 import org.jetbrains.kotlin.backend.jvm.JvmIrCodegenFactory
 import org.jetbrains.kotlin.backend.jvm.jvmPhases
 import org.jetbrains.kotlin.cli.common.CLIConfigurationKeys
@@ -42,6 +43,7 @@ import org.jetbrains.kotlin.container.get
 import org.jetbrains.kotlin.descriptors.ModuleDescriptor
 import org.jetbrains.kotlin.fir.backend.Fir2IrConverter
 import org.jetbrains.kotlin.fir.backend.jvm.FirJvmBackendClassResolver
+import org.jetbrains.kotlin.fir.backend.jvm.FirJvmClassCodegen
 import org.jetbrains.kotlin.fir.builder.RawFirBuilder
 import org.jetbrains.kotlin.fir.createSession
 import org.jetbrains.kotlin.fir.resolve.firProvider
@@ -49,6 +51,7 @@ import org.jetbrains.kotlin.fir.resolve.impl.FirProviderImpl
 import org.jetbrains.kotlin.fir.resolve.transformers.FirTotalResolveTransformer
 import org.jetbrains.kotlin.ir.backend.jvm.jvmResolveLibraries
 import org.jetbrains.kotlin.ir.backend.jvm.serialization.JvmManglerDesc
+import org.jetbrains.kotlin.ir.declarations.IrClass
 import org.jetbrains.kotlin.load.kotlin.PackagePartProvider
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.resolve.AnalyzingUtils
@@ -141,7 +144,9 @@ object GenerationUtils {
             Fir2IrConverter.createModuleFragment(
                 session, resolveTransformer.scopeSession, firFiles,
                 configuration.languageVersionSettings,
-                signaturer = IdSignatureDescriptor(JvmManglerDesc())
+                signaturer = IdSignatureDescriptor(JvmManglerDesc()),
+                // TODO: differentiate JVM resolve from other targets, such as JS resolve.
+                generatorExtensions = JvmGeneratorExtensions(generateFacades = false)
             )
         val dummyBindingContext = NoScopeRecordCliBindingTrace().bindingContext
 
@@ -163,7 +168,12 @@ object GenerationUtils {
         ).build()
 
         generationState.beforeCompile()
-        codegenFactory.generateModuleInFrontendIRMode(generationState, moduleFragment, symbolTable, sourceManager)
+        codegenFactory.generateModuleInFrontendIRMode(
+            generationState, moduleFragment, symbolTable, sourceManager
+        ) { irClass, context, irFunction ->
+            FirJvmClassCodegen(irClass, context, irFunction, session)
+        }
+
         generationState.factory.done()
         return generationState
     }

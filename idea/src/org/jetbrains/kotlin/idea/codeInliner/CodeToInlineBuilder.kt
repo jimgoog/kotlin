@@ -1,22 +1,14 @@
 /*
- * Copyright 2010-2016 JetBrains s.r.o.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright 2010-2020 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.idea.codeInliner
 
-import org.jetbrains.kotlin.descriptors.*
+import org.jetbrains.kotlin.descriptors.CallableDescriptor
+import org.jetbrains.kotlin.descriptors.PropertyDescriptor
+import org.jetbrains.kotlin.descriptors.TypeParameterDescriptor
+import org.jetbrains.kotlin.descriptors.ValueParameterDescriptor
 import org.jetbrains.kotlin.diagnostics.Errors
 import org.jetbrains.kotlin.idea.caches.resolve.getResolutionFacade
 import org.jetbrains.kotlin.idea.core.asExpression
@@ -33,6 +25,7 @@ import org.jetbrains.kotlin.psi.psiUtil.getReceiverExpression
 import org.jetbrains.kotlin.psi.psiUtil.getStrictParentOfType
 import org.jetbrains.kotlin.renderer.render
 import org.jetbrains.kotlin.resolve.BindingContext
+import org.jetbrains.kotlin.resolve.ImportedFromObjectCallableDescriptor
 import org.jetbrains.kotlin.resolve.calls.callUtil.getResolvedCall
 import org.jetbrains.kotlin.resolve.calls.model.isReallySuccess
 import org.jetbrains.kotlin.resolve.descriptorUtil.fqNameOrNull
@@ -60,12 +53,11 @@ class CodeToInlineBuilder(
         reformat: Boolean
     ): CodeToInline {
         var bindingContext = analyze()
-
-        val descriptor = mainExpression.getResolvedCall(bindingContext)?.resultingDescriptor
-        val alwaysKeepMainExpression = when (descriptor) {
+        val alwaysKeepMainExpression = when (val descriptor = mainExpression.getResolvedCall(bindingContext)?.resultingDescriptor) {
             is PropertyDescriptor -> descriptor.getter?.isDefault == false
             else -> false
         }
+
         val codeToInline = MutableCodeToInline(
             mainExpression,
             statementsBefore.toMutableList(),
@@ -98,6 +90,7 @@ class CodeToInlineBuilder(
             ErrorUtils.containsErrorTypeInParameters(lambdaDescriptor) ||
             ErrorUtils.containsErrorType(lambdaDescriptor.returnType)
         ) return null
+
         return lambdaDescriptor.valueParameters.joinToString {
             it.name.render() + ": " + IdeDescriptorRenderers.SOURCE_CODE.renderType(it.type)
         }
@@ -106,10 +99,10 @@ class CodeToInlineBuilder(
     private fun addFunctionLiteralParameterTypes(parameters: String, inlinedExpression: KtExpression) {
         val containingFile = inlinedExpression.containingKtFile
         val resolutionFacade = containingFile.getResolutionFacade()
-
         val lambdaExpr = inlinedExpression.unpackFunctionLiteral(true).sure {
             "can't find function literal expression for " + inlinedExpression.text
         }
+
         if (!needToAddParameterTypes(lambdaExpr, resolutionFacade)) return
         SpecifyExplicitLambdaSignatureIntention.applyWithParameters(lambdaExpr, parameters)
     }
@@ -123,11 +116,11 @@ class CodeToInlineBuilder(
         return context.diagnostics.any { diagnostic ->
             val factory = diagnostic.factory
             val element = diagnostic.psiElement
-            val hasCantInferParameter = factory == Errors.CANNOT_INFER_PARAMETER_TYPE &&
-                    element.parent.parent == functionLiteral
+            val hasCantInferParameter = factory == Errors.CANNOT_INFER_PARAMETER_TYPE && element.parent.parent == functionLiteral
             val hasUnresolvedItOrThis = factory == Errors.UNRESOLVED_REFERENCE &&
                     element.text == "it" &&
                     element.getStrictParentOfType<KtFunctionLiteral>() == functionLiteral
+
             hasCantInferParameter || hasUnresolvedItOrThis
         }
     }
@@ -169,12 +162,14 @@ class CodeToInlineBuilder(
                 } else {
                     target.importableFqName
                 }
+
                 if (importableFqName != null) {
-                    val lexicalScope = (expression?.containingFile as? KtFile)?.getResolutionScope(bindingContext, resolutionFacade)
-                    val lookupName = importableFqName?.let {
-                        lexicalScope?.findClassifier(it.shortName(), NoLookupLocation.FROM_IDE)?.typeConstructor
-                            ?.declarationDescriptor?.fqNameOrNull()
-                    }
+                    val lexicalScope = (expression.containingFile as? KtFile)?.getResolutionScope(bindingContext, resolutionFacade)
+                    val lookupName = lexicalScope?.findClassifier(importableFqName.shortName(), NoLookupLocation.FROM_IDE)
+                        ?.typeConstructor
+                        ?.declarationDescriptor
+                        ?.fqNameOrNull()
+
                     codeToInline.fqNamesToImport.add(lookupName ?: importableFqName)
                 }
             }
@@ -186,17 +181,20 @@ class CodeToInlineBuilder(
                     expression.putCopyableUserData(CodeToInline.TYPE_PARAMETER_USAGE_KEY, target.name)
                 }
 
-                val resolvedCall = expression.getResolvedCall(bindingContext)
-                if (resolvedCall != null && resolvedCall.isReallySuccess()) {
-                    val receiver = if (resolvedCall.resultingDescriptor.isExtension)
-                        resolvedCall.extensionReceiver
-                    else
-                        resolvedCall.dispatchReceiver
-                    if (receiver is ImplicitReceiver) {
-                        val resolutionScope = expression.getResolutionScope(bindingContext, resolutionFacade)
-                        val receiverExpression = receiver.asExpression(resolutionScope, psiFactory)
-                        if (receiverExpression != null) {
-                            receiversToAdd.add(Triple(expression, receiverExpression, receiver.type))
+                if (targetCallable !is ImportedFromObjectCallableDescriptor<*>) {
+                    val resolvedCall = expression.getResolvedCall(bindingContext)
+                    if (resolvedCall != null && resolvedCall.isReallySuccess()) {
+                        val receiver = if (resolvedCall.resultingDescriptor.isExtension)
+                            resolvedCall.extensionReceiver
+                        else
+                            resolvedCall.dispatchReceiver
+
+                        if (receiver is ImplicitReceiver) {
+                            val resolutionScope = expression.getResolutionScope(bindingContext, resolutionFacade)
+                            val receiverExpression = receiver.asExpression(resolutionScope, psiFactory)
+                            if (receiverExpression != null) {
+                                receiversToAdd.add(Triple(expression, receiverExpression, receiver.type))
+                            }
                         }
                     }
                 }

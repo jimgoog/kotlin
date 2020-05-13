@@ -211,6 +211,11 @@ public class JsCodegenInlineTestGenerated extends AbstractJsCodegenInlineTest {
             runTest("compiler/testData/codegen/boxInline/anonymousObject/kt34656.kt");
         }
 
+        @TestMetadata("kt38197.kt")
+        public void testKt38197() throws Exception {
+            runTest("compiler/testData/codegen/boxInline/anonymousObject/kt38197.kt");
+        }
+
         @TestMetadata("kt6552.kt")
         public void testKt6552() throws Exception {
             runTest("compiler/testData/codegen/boxInline/anonymousObject/kt6552.kt");
@@ -951,6 +956,11 @@ public class JsCodegenInlineTestGenerated extends AbstractJsCodegenInlineTest {
             runTest("compiler/testData/codegen/boxInline/complexStack/asCheck2.kt");
         }
 
+        @TestMetadata("breakContinueInInlineLambdaArgument.kt")
+        public void testBreakContinueInInlineLambdaArgument() throws Exception {
+            runTest("compiler/testData/codegen/boxInline/complexStack/breakContinueInInlineLambdaArgument.kt");
+        }
+
         @TestMetadata("simple.kt")
         public void testSimple() throws Exception {
             runTest("compiler/testData/codegen/boxInline/complexStack/simple.kt");
@@ -974,6 +984,11 @@ public class JsCodegenInlineTestGenerated extends AbstractJsCodegenInlineTest {
         @TestMetadata("simpleExtension.kt")
         public void testSimpleExtension() throws Exception {
             runTest("compiler/testData/codegen/boxInline/complexStack/simpleExtension.kt");
+        }
+
+        @TestMetadata("spillConstructorArgumentsAndInlineLambdaParameter.kt")
+        public void testSpillConstructorArgumentsAndInlineLambdaParameter() throws Exception {
+            runTest("compiler/testData/codegen/boxInline/complexStack/spillConstructorArgumentsAndInlineLambdaParameter.kt");
         }
     }
 
@@ -3291,6 +3306,16 @@ public class JsCodegenInlineTestGenerated extends AbstractJsCodegenInlineTest {
             runTest("compiler/testData/codegen/boxInline/stackOnReturn/nonLocalReturn3.kt");
         }
 
+        @TestMetadata("poppedLocalReturn.kt")
+        public void testPoppedLocalReturn() throws Exception {
+            runTest("compiler/testData/codegen/boxInline/stackOnReturn/poppedLocalReturn.kt");
+        }
+
+        @TestMetadata("poppedLocalReturn2.kt")
+        public void testPoppedLocalReturn2() throws Exception {
+            runTest("compiler/testData/codegen/boxInline/stackOnReturn/poppedLocalReturn2.kt");
+        }
+
         @TestMetadata("returnLong.kt")
         public void testReturnLong() throws Exception {
             runTest("compiler/testData/codegen/boxInline/stackOnReturn/returnLong.kt");
@@ -3416,6 +3441,16 @@ public class JsCodegenInlineTestGenerated extends AbstractJsCodegenInlineTest {
         @TestMetadata("tryCatchStackTransform.kt")
         public void testTryCatchStackTransform_1_3() throws Exception {
             runTestWithPackageReplacement("compiler/testData/codegen/boxInline/suspend/tryCatchStackTransform.kt", "kotlin.coroutines");
+        }
+
+        @TestMetadata("twiceRegeneratedAnonymousObject.kt")
+        public void testTwiceRegeneratedAnonymousObject() throws Exception {
+            runTest("compiler/testData/codegen/boxInline/suspend/twiceRegeneratedAnonymousObject.kt");
+        }
+
+        @TestMetadata("twiceRegeneratedSuspendLambda.kt")
+        public void testTwiceRegeneratedSuspendLambda() throws Exception {
+            runTest("compiler/testData/codegen/boxInline/suspend/twiceRegeneratedSuspendLambda.kt");
         }
 
         @TestMetadata("compiler/testData/codegen/boxInline/suspend/callableReference")

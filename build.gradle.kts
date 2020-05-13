@@ -38,6 +38,7 @@ if (kotlinBuildProperties.buildScanServer != null) {
 }
 
 plugins {
+    base
     idea
     id("jps-compatible")
     id("org.jetbrains.gradle.plugin.idea-ext")
@@ -53,7 +54,6 @@ pill {
 }
 
 val isTeamcityBuild = project.kotlinBuildProperties.isTeamcityBuild
-val includeStdlibJsIr by extra(project.kotlinBuildProperties.includeStdlibJsIr)
 
 val configuredJdks: List<JdkId> =
     getConfiguredJdks().also {
@@ -64,7 +64,11 @@ val configuredJdks: List<JdkId> =
 
 val defaultSnapshotVersion: String by extra
 val buildNumber by extra(findProperty("build.number")?.toString() ?: defaultSnapshotVersion)
-val kotlinVersion by extra(findProperty("deployVersion")?.toString() ?: buildNumber)
+val kotlinVersion by extra(
+        findProperty("deployVersion")?.toString()?.let { deploySnapshotStr ->
+            if (deploySnapshotStr != "default.snapshot") deploySnapshotStr else defaultSnapshotVersion
+        } ?: buildNumber
+)
 
 val kotlinLanguageVersion by extra("1.4")
 
@@ -165,7 +169,7 @@ extra["versions.kotlinx-coroutines-jdk8"] = coroutinesVersion
 extra["versions.json"] = "20160807"
 extra["versions.native-platform"] = "0.14"
 extra["versions.ant-launcher"] = "1.8.0"
-extra["versions.robolectric"] = "3.1"
+extra["versions.robolectric"] = "4.0"
 extra["versions.org.springframework"] = "4.2.0.RELEASE"
 extra["versions.jflex"] = "1.7.0"
 extra["versions.markdown"] = "0.1.25"
@@ -180,7 +184,7 @@ extra["versions.kotlinx-collections-immutable-jvm"] = immutablesVersion
 extra["versions.ktor-network"] = "1.0.1"
 
 if (!project.hasProperty("versions.kotlin-native")) {
-    extra["versions.kotlin-native"] = "1.4-M2-dev-15123"
+    extra["versions.kotlin-native"] = "1.4-M3-dev-15453"
 }
 
 val intellijUltimateEnabled by extra(project.kotlinBuildProperties.intellijUltimateEnabled)
@@ -259,6 +263,7 @@ extra["compilerModules"] = arrayOf(
     ":core:type-system",
     ":compiler:fir:cones",
     ":compiler:fir:resolve",
+    ":compiler:fir:fir-serialization",
     ":compiler:fir:tree",
     ":compiler:fir:raw-fir:fir-common",
     ":compiler:fir:raw-fir:psi2fir",
@@ -275,9 +280,7 @@ val coreLibProjects = listOfNotNull(
     ":kotlin-stdlib",
     ":kotlin-stdlib-common",
     ":kotlin-stdlib-js",
-    // Exclude JS IR from core libs because it depends on local compiler build, which
-    // in turn depends on local JVM stdlib. It slows down library testing.
-    ":kotlin-stdlib-js-ir".takeIf { includeStdlibJsIr },
+    ":kotlin-stdlib-js-ir",
     ":kotlin-stdlib-jdk7",
     ":kotlin-stdlib-jdk8",
     ":kotlin-test:kotlin-test-annotations-common",
@@ -287,6 +290,7 @@ val coreLibProjects = listOfNotNull(
     ":kotlin-test:kotlin-test-junit5",
     ":kotlin-test:kotlin-test-testng",
     ":kotlin-test:kotlin-test-js".takeIf { !kotlinBuildProperties.isInJpsBuildIdeaSync },
+    ":kotlin-test:kotlin-test-js-ir".takeIf { !kotlinBuildProperties.isInJpsBuildIdeaSync },
     ":kotlin-reflect",
     ":kotlin-coroutines-experimental-compat"
 )
@@ -354,7 +358,7 @@ allprojects {
         maven("https://jetbrains.bintray.com/intellij-third-party-dependencies")
         maven("https://dl.google.com/dl/android/maven2")
         bootstrapKotlinRepo?.let(::maven)
-        internalKotlinRepo?.let(::maven)
+        internalBootstrapRepo?.let(::maven)
     }
 
     configureJvmProject(javaHome!!, jvmTarget!!)
@@ -417,6 +421,9 @@ allprojects {
         register("listRuntimeJar") { listConfigurationContents("runtimeJar") }
 
         register("listDistJar") { listConfigurationContents("distJar") }
+
+        // Aggregate task for build related checks
+        register("checkBuild")
     }
 
     afterEvaluate {
@@ -452,9 +459,6 @@ allprojects {
             configurations.findByName("kotlinCompilerPluginClasspath")
                 ?.exclude("org.jetbrains.kotlin", "kotlin-scripting-compiler-embeddable")
         }
-
-        // Aggregate task for build related checks
-        tasks.register("checkBuild")
 
         apply(from = "$rootDir/gradle/cacheRedirector.gradle.kts")
     }
@@ -492,7 +496,7 @@ val ideaPlugin by task<Task> {
 }
 
 tasks {
-    register("clean") {
+    named("clean") {
         doLast {
             delete("$buildDir/repo")
             delete(distDir)
@@ -574,11 +578,13 @@ tasks {
 
     register("firAllTest") {
         dependsOn(
+            ":dist",
             ":compiler:fir:raw-fir:psi2fir:test",
             ":compiler:fir:raw-fir:light-tree2fir:test",
             ":compiler:fir:analysis-tests:test",
             ":compiler:fir:fir2ir:test",
-            ":idea:idea-fir:test"
+            ":idea:idea-fir:test",
+            ":plugins:fir:fir-plugin-prototype:test"
         )
     }
 
@@ -610,7 +616,7 @@ tasks {
         dependsOn("nativeCompilerTest")
         dependsOn("firCompilerTest")
 
-        dependsOn(":compiler:daemon:daemon-tests:test")
+        dependsOn(":kotlin-daemon-tests:test")
         dependsOn("scriptingTest")
         dependsOn(":kotlin-build-common:test")
         dependsOn(":compiler:incremental-compilation-impl:test")
@@ -745,8 +751,16 @@ tasks {
         }
     }
 
-    register("check") {
+    named("check") {
         dependsOn("test")
+    }
+
+    named("checkBuild") {
+        if (kotlinBuildProperties.isTeamcityBuild) {
+            doFirst {
+                println("##teamcity[setParameter name='bootstrap.kotlin.version' value='$bootstrapKotlinVersion']")
+            }
+        }
     }
 }
 

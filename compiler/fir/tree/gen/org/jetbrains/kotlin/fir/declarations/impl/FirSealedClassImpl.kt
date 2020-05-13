@@ -9,6 +9,8 @@ import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.FirSourceElement
 import org.jetbrains.kotlin.fir.declarations.FirDeclaration
+import org.jetbrains.kotlin.fir.declarations.FirDeclarationAttributes
+import org.jetbrains.kotlin.fir.declarations.FirDeclarationOrigin
 import org.jetbrains.kotlin.fir.declarations.FirDeclarationStatus
 import org.jetbrains.kotlin.fir.declarations.FirRegularClass
 import org.jetbrains.kotlin.fir.declarations.FirResolvePhase
@@ -33,6 +35,7 @@ internal class FirSealedClassImpl(
     override val source: FirSourceElement?,
     override val session: FirSession,
     override var resolvePhase: FirResolvePhase,
+    override val origin: FirDeclarationOrigin,
     override val annotations: MutableList<FirAnnotationCall>,
     override val typeParameters: MutableList<FirTypeParameterRef>,
     override var status: FirDeclarationStatus,
@@ -45,6 +48,7 @@ internal class FirSealedClassImpl(
     override val superTypeRefs: MutableList<FirTypeRef>,
     override val inheritors: MutableList<ClassId>,
 ) : FirSealedClass() {
+    override val attributes: FirDeclarationAttributes = FirDeclarationAttributes()
     override val hasLazyNestedClassifiers: Boolean get() = false
     override var controlFlowGraphReference: FirControlFlowGraphReference = FirEmptyControlFlowGraphReference
 
@@ -67,7 +71,7 @@ internal class FirSealedClassImpl(
         transformStatus(transformer, data)
         transformDeclarations(transformer, data)
         companionObject = declarations.asSequence().filterIsInstance<FirRegularClass>().firstOrNull { it.status.isCompanion }
-        superTypeRefs.transformInplace(transformer, data)
+        transformSuperTypeRefs(transformer, data)
         transformControlFlowGraphReference(transformer, data)
         return this
     }
@@ -89,6 +93,11 @@ internal class FirSealedClassImpl(
 
     override fun <D> transformCompanionObject(transformer: FirTransformer<D>, data: D): FirSealedClassImpl {
         companionObject = companionObject?.transformSingle(transformer, data)
+        return this
+    }
+
+    override fun <D> transformSuperTypeRefs(transformer: FirTransformer<D>, data: D): FirSealedClassImpl {
+        superTypeRefs.transformInplace(transformer, data)
         return this
     }
 

@@ -18,7 +18,6 @@ import org.jetbrains.kotlin.ir.declarations.*
 import org.jetbrains.kotlin.ir.declarations.impl.IrClassImpl
 import org.jetbrains.kotlin.ir.declarations.impl.IrEnumEntryImpl
 import org.jetbrains.kotlin.ir.declarations.impl.IrTypeParameterImpl
-import org.jetbrains.kotlin.ir.declarations.impl.IrValueParameterImpl
 import org.jetbrains.kotlin.ir.descriptors.*
 import org.jetbrains.kotlin.ir.expressions.impl.IrEnumConstructorCallImpl
 import org.jetbrains.kotlin.ir.expressions.impl.IrExpressionBodyImpl
@@ -143,9 +142,7 @@ class Fir2IrClassifierStorage(
             return createIrAnonymousObject(klass, irParent = parent)
         }
         val regularClass = klass as FirRegularClass
-        val origin =
-            if (firProvider.getFirClassifierContainerFileIfAny(klass.symbol) != null) IrDeclarationOrigin.DEFINED
-            else IrDeclarationOrigin.IR_EXTERNAL_DECLARATION_STUB
+        val origin = regularClass.irOrigin(firProvider)
         val irClass = registerIrClass(regularClass, parent, origin)
         processClassHeader(regularClass, irClass)
         return irClass
@@ -188,7 +185,7 @@ class Fir2IrClassifierStorage(
                     isExpect = regularClass.isExpect,
                     isFun = false // TODO FirRegularClass.isFun
                 ).apply {
-                    metadata = MetadataSource.Class(descriptor)
+                    metadata = FirMetadataSource.Class(regularClass, descriptor)
                     descriptor.bind(this)
                 }
             }
@@ -223,7 +220,7 @@ class Fir2IrClassifierStorage(
                     isCompanion = false, isInner = false, isData = false,
                     isExternal = false, isInline = false, isExpect = false, isFun = false
                 ).apply {
-                    metadata = MetadataSource.Class(descriptor)
+                    metadata = FirMetadataSource.Class(anonymousObject, descriptor)
                     descriptor.bind(this)
                     setThisReceiver(anonymousObject.typeParameters)
                     if (irParent != null) {
@@ -340,7 +337,7 @@ class Fir2IrClassifierStorage(
                         val klass = getIrAnonymousObjectForEnumEntry(initializer, enumEntry.name, irParent)
 
                         this.correspondingClass = klass
-                    } else if (irParent != null) {
+                    } else if (irParent != null && origin == IrDeclarationOrigin.DEFINED) {
                         this.initializerExpression = IrExpressionBodyImpl(
                             IrEnumConstructorCallImpl(startOffset, endOffset, irType, irParent.constructors.first().symbol)
                         )

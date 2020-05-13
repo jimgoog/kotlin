@@ -1,3 +1,8 @@
+/*
+ * Copyright 2010-2020 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
+ */
+
 package org.jetbrains.kotlin.gradle.targets.js.nodejs
 
 import org.gradle.api.Project
@@ -8,6 +13,7 @@ import org.jetbrains.kotlin.gradle.targets.js.NpmVersions
 import org.jetbrains.kotlin.gradle.targets.js.npm.KotlinNpmResolutionManager
 import org.jetbrains.kotlin.gradle.targets.js.npm.NpmApi
 import org.jetbrains.kotlin.gradle.targets.js.npm.tasks.KotlinNpmInstallTask
+import org.jetbrains.kotlin.gradle.targets.js.npm.tasks.RootPackageJsonTask
 import org.jetbrains.kotlin.gradle.targets.js.yarn.Yarn
 import org.jetbrains.kotlin.gradle.tasks.internal.CleanableStore
 import java.io.File
@@ -49,6 +55,9 @@ open class NodeJsRootExtension(val rootProject: Project) : ConfigurationPhaseAwa
 
     val npmInstallTask: KotlinNpmInstallTask
         get() = rootProject.tasks.getByName(KotlinNpmInstallTask.NAME) as KotlinNpmInstallTask
+
+    val rootPackageJsonTask: RootPackageJsonTask
+        get() = rootProject.tasks.getByName(RootPackageJsonTask.NAME) as RootPackageJsonTask
 
     val rootPackageDir: File
         get() = rootProject.buildDir.resolve("js")

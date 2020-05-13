@@ -8,6 +8,8 @@ package org.jetbrains.kotlin.fir.declarations.impl
 import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.FirSourceElement
 import org.jetbrains.kotlin.fir.declarations.FirConstructor
+import org.jetbrains.kotlin.fir.declarations.FirDeclarationAttributes
+import org.jetbrains.kotlin.fir.declarations.FirDeclarationOrigin
 import org.jetbrains.kotlin.fir.declarations.FirDeclarationStatus
 import org.jetbrains.kotlin.fir.declarations.FirResolvePhase
 import org.jetbrains.kotlin.fir.declarations.FirTypeParameterRef
@@ -31,6 +33,7 @@ internal class FirConstructorImpl(
     override val source: FirSourceElement?,
     override val session: FirSession,
     override var resolvePhase: FirResolvePhase,
+    override val origin: FirDeclarationOrigin,
     override var returnTypeRef: FirTypeRef,
     override var receiverTypeRef: FirTypeRef?,
     override val typeParameters: MutableList<FirTypeParameterRef>,
@@ -42,6 +45,7 @@ internal class FirConstructorImpl(
     override var delegatedConstructor: FirDelegatedConstructorCall?,
     override var body: FirBlock?,
 ) : FirConstructor() {
+    override val attributes: FirDeclarationAttributes = FirDeclarationAttributes()
     override var controlFlowGraphReference: FirControlFlowGraphReference = FirEmptyControlFlowGraphReference
     override val isPrimary: Boolean get() = false
 

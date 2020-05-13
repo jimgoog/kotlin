@@ -21,6 +21,8 @@ interface FirTypedDeclaration : FirDeclaration, FirAnnotationContainer {
     override val source: FirSourceElement?
     override val session: FirSession
     override val resolvePhase: FirResolvePhase
+    override val origin: FirDeclarationOrigin
+    override val attributes: FirDeclarationAttributes
     override val annotations: List<FirAnnotationCall>
     val returnTypeRef: FirTypeRef
 

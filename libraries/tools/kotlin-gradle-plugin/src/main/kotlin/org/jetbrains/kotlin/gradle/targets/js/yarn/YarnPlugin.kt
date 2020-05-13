@@ -1,13 +1,16 @@
 /*
- * Copyright 2010-2019 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
- * that can be found in the license/LICENSE.txt file.
+ * Copyright 2010-2020 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
 package org.jetbrains.kotlin.gradle.targets.js.yarn
 
 import org.gradle.api.Plugin
 import org.gradle.api.Project
+import org.gradle.api.plugins.BasePlugin
 import org.jetbrains.kotlin.gradle.targets.js.nodejs.NodeJsRootPlugin
+import org.jetbrains.kotlin.gradle.targets.js.npm.tasks.KotlinNpmInstallTask
+import org.jetbrains.kotlin.gradle.targets.js.npm.tasks.RootPackageJsonTask
 import org.jetbrains.kotlin.gradle.tasks.CleanDataTask
 
 open class YarnPlugin : Plugin<Project> {
@@ -16,12 +19,24 @@ open class YarnPlugin : Plugin<Project> {
             "YarnPlugin can be applied only to root project"
         }
 
-        val nodeJs = NodeJsRootPlugin.apply(this)
-
         val yarnRootExtension = this.extensions.create(YarnRootExtension.YARN, YarnRootExtension::class.java, this)
+        val nodeJs = NodeJsRootPlugin.apply(this)
 
         tasks.create(YarnSetupTask.NAME, YarnSetupTask::class.java) {
             it.dependsOn(nodeJs.nodeJsSetupTask)
+        }
+
+        val rootClean = project.rootProject.tasks.named(BasePlugin.CLEAN_TASK_NAME)
+
+        val rootPackageJson = tasks.register(RootPackageJsonTask.NAME, RootPackageJsonTask::class.java) { task ->
+            task.group = NodeJsRootPlugin.TASKS_GROUP_NAME
+            task.description = "Create root package.json"
+
+            task.mustRunAfter(rootClean)
+        }
+
+        tasks.named(KotlinNpmInstallTask.NAME).configure {
+            it.dependsOn(rootPackageJson)
         }
 
         tasks.register("yarn" + CleanDataTask.NAME_SUFFIX, CleanDataTask::class.java) {

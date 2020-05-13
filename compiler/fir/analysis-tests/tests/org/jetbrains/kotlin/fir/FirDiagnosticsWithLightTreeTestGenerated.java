@@ -811,6 +811,11 @@ public class FirDiagnosticsWithLightTreeTestGenerated extends AbstractFirDiagnos
             KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/fir/analysis-tests/testData/resolve/diagnostics"), Pattern.compile("^([^.]+)\\.kt$"), null, true);
         }
 
+        @TestMetadata("annotationClassMember.kt")
+        public void testAnnotationClassMember() throws Exception {
+            runTest("compiler/fir/analysis-tests/testData/resolve/diagnostics/annotationClassMember.kt");
+        }
+
         @TestMetadata("incompatibleModifiers.kt")
         public void testIncompatibleModifiers() throws Exception {
             runTest("compiler/fir/analysis-tests/testData/resolve/diagnostics/incompatibleModifiers.kt");
@@ -821,9 +826,19 @@ public class FirDiagnosticsWithLightTreeTestGenerated extends AbstractFirDiagnos
             runTest("compiler/fir/analysis-tests/testData/resolve/diagnostics/infixFunctions.kt");
         }
 
+        @TestMetadata("localAnnotationClass.kt")
+        public void testLocalAnnotationClass() throws Exception {
+            runTest("compiler/fir/analysis-tests/testData/resolve/diagnostics/localAnnotationClass.kt");
+        }
+
         @TestMetadata("notASupertype.kt")
         public void testNotASupertype() throws Exception {
             runTest("compiler/fir/analysis-tests/testData/resolve/diagnostics/notASupertype.kt");
+        }
+
+        @TestMetadata("qualifiedSupertypeExtendedByOtherSupertype.kt")
+        public void testQualifiedSupertypeExtendedByOtherSupertype() throws Exception {
+            runTest("compiler/fir/analysis-tests/testData/resolve/diagnostics/qualifiedSupertypeExtendedByOtherSupertype.kt");
         }
 
         @TestMetadata("redundantModifier.kt")
@@ -849,6 +864,11 @@ public class FirDiagnosticsWithLightTreeTestGenerated extends AbstractFirDiagnos
         @TestMetadata("superclassNotAccessibleFromInterface.kt")
         public void testSuperclassNotAccessibleFromInterface() throws Exception {
             runTest("compiler/fir/analysis-tests/testData/resolve/diagnostics/superclassNotAccessibleFromInterface.kt");
+        }
+
+        @TestMetadata("valOnAnnotationParameter.kt")
+        public void testValOnAnnotationParameter() throws Exception {
+            runTest("compiler/fir/analysis-tests/testData/resolve/diagnostics/valOnAnnotationParameter.kt");
         }
     }
 
@@ -1624,6 +1644,11 @@ public class FirDiagnosticsWithLightTreeTestGenerated extends AbstractFirDiagnos
             runTest("compiler/fir/analysis-tests/testData/resolve/problems/flexibleTypeVarAgainstNull.kt");
         }
 
+        @TestMetadata("innerClassHierarchy.kt")
+        public void testInnerClassHierarchy() throws Exception {
+            runTest("compiler/fir/analysis-tests/testData/resolve/problems/innerClassHierarchy.kt");
+        }
+
         @TestMetadata("javaAccessorConversion.kt")
         public void testJavaAccessorConversion() throws Exception {
             runTest("compiler/fir/analysis-tests/testData/resolve/problems/javaAccessorConversion.kt");
@@ -1642,6 +1667,11 @@ public class FirDiagnosticsWithLightTreeTestGenerated extends AbstractFirDiagnos
         @TestMetadata("multipleJavaClassesInOneFile.kt")
         public void testMultipleJavaClassesInOneFile() throws Exception {
             runTest("compiler/fir/analysis-tests/testData/resolve/problems/multipleJavaClassesInOneFile.kt");
+        }
+
+        @TestMetadata("objectDerivedFromInnerClass.kt")
+        public void testObjectDerivedFromInnerClass() throws Exception {
+            runTest("compiler/fir/analysis-tests/testData/resolve/problems/objectDerivedFromInnerClass.kt");
         }
 
         @TestMetadata("safeCallInvoke.kt")
@@ -2178,9 +2208,19 @@ public class FirDiagnosticsWithLightTreeTestGenerated extends AbstractFirDiagnos
             runTest("compiler/fir/analysis-tests/testData/resolve/visibility/exposedPropertyType.kt");
         }
 
+        @TestMetadata("exposedSupertype.kt")
+        public void testExposedSupertype() throws Exception {
+            runTest("compiler/fir/analysis-tests/testData/resolve/visibility/exposedSupertype.kt");
+        }
+
         @TestMetadata("exposedTypeAlias.kt")
         public void testExposedTypeAlias() throws Exception {
             runTest("compiler/fir/analysis-tests/testData/resolve/visibility/exposedTypeAlias.kt");
+        }
+
+        @TestMetadata("exposedTypeParameters.kt")
+        public void testExposedTypeParameters() throws Exception {
+            runTest("compiler/fir/analysis-tests/testData/resolve/visibility/exposedTypeParameters.kt");
         }
 
         @TestMetadata("protectedInCompanion.kt")

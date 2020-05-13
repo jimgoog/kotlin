@@ -89,15 +89,8 @@ class DefaultKotlinDependencyHandler(
             version = version
         )
 
-    override fun npm(name: String, directory: File): NpmDependency {
-        check(directory.isDirectory) {
-            "Dependency on local path should point on directory but $directory found"
-        }
-        return npm(
-            name = name,
-            version = fileVersion(directory)
-        )
-    }
+    override fun npm(name: String, directory: File): NpmDependency =
+        directoryNpmDependency(name, directory, NpmDependency.Scope.NORMAL)
 
     override fun npm(directory: File): NpmDependency =
         npm(
@@ -107,4 +100,63 @@ class DefaultKotlinDependencyHandler(
 
     override fun npm(org: String?, packageName: String, version: String) =
         npm("${if (org != null) "@$org/" else ""}$packageName", version)
+
+    override fun devNpm(name: String, version: String): NpmDependency =
+        NpmDependency(
+            project = project,
+            name = name,
+            version = version,
+            scope = NpmDependency.Scope.DEV
+        )
+
+    override fun devNpm(name: String, directory: File): NpmDependency =
+        directoryNpmDependency(name, directory, NpmDependency.Scope.DEV)
+
+    override fun devNpm(directory: File): NpmDependency =
+        devNpm(
+            name = moduleName(directory),
+            directory = directory
+        )
+
+    override fun optionalNpm(name: String, version: String): NpmDependency =
+        NpmDependency(
+            project = project,
+            name = name,
+            version = version,
+            scope = NpmDependency.Scope.OPTIONAL
+        )
+
+    override fun optionalNpm(name: String, directory: File): NpmDependency =
+        directoryNpmDependency(name, directory, NpmDependency.Scope.OPTIONAL)
+
+    override fun optionalNpm(directory: File): NpmDependency =
+        optionalNpm(
+            name = moduleName(directory),
+            directory = directory
+        )
+
+    override fun peerNpm(name: String, version: String): NpmDependency =
+        NpmDependency(
+            project = project,
+            name = name,
+            version = version,
+            scope = NpmDependency.Scope.PEER
+        )
+
+    private fun directoryNpmDependency(
+        name: String,
+        directory: File,
+        scope: NpmDependency.Scope
+    ): NpmDependency {
+        check(directory.isDirectory) {
+            "Dependency on local path should point on directory but $directory found"
+        }
+
+        return NpmDependency(
+            project = project,
+            name = name,
+            version = fileVersion(directory),
+            scope = scope
+        )
+    }
 }

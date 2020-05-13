@@ -6,7 +6,10 @@
 package org.jetbrains.kotlin.idea.debugger.coroutine.proxy
 
 import com.intellij.xdebugger.frame.XNamedValue
-import org.jetbrains.kotlin.idea.debugger.coroutine.data.*
+import org.jetbrains.kotlin.idea.debugger.coroutine.data.CoroutineInfoData
+import org.jetbrains.kotlin.idea.debugger.coroutine.data.CoroutineNameIdState
+import org.jetbrains.kotlin.idea.debugger.coroutine.data.CreationCoroutineStackFrameItem
+import org.jetbrains.kotlin.idea.debugger.coroutine.data.SuspendCoroutineStackFrameItem
 import org.jetbrains.kotlin.idea.debugger.coroutine.proxy.mirror.DebugMetadata
 import org.jetbrains.kotlin.idea.debugger.coroutine.proxy.mirror.DebugProbesImpl
 import org.jetbrains.kotlin.idea.debugger.coroutine.proxy.mirror.MirrorOfCoroutineInfo
@@ -26,16 +29,16 @@ class CoroutineLibraryAgent2Proxy(private val executionContext: DefaultExecution
         return result.mapNotNull { mapToCoroutineInfoData(it) }
     }
 
-    fun mapToCoroutineInfoData(mirror: MirrorOfCoroutineInfo): CoroutineInfoData? {
-        val cnis = CoroutineNameIdState.instance(mirror)
-        val stackTrace = mirror.enchancedStackTrace?.mapNotNull { it.stackTraceElement() } ?: emptyList()
+    private fun mapToCoroutineInfoData(mirror: MirrorOfCoroutineInfo): CoroutineInfoData? {
+        val coroutineNameIdState = CoroutineNameIdState.instance(mirror)
+        val stackTrace = mirror.enhancedStackTrace?.mapNotNull { it.stackTraceElement() } ?: emptyList()
         val variables: List<XNamedValue> = mirror.lastObservedFrame?.let {
             val spilledVariables = debugMetadata?.baseContinuationImpl?.mirror(it, executionContext)
             spilledVariables?.spilledValues(executionContext)
         } ?: emptyList()
-        var stackFrames = findStackFrames(stackTrace, variables)
+        val stackFrames = findStackFrames(stackTrace, variables)
         return CoroutineInfoData(
-            cnis,
+            coroutineNameIdState,
             stackFrames.restoredStackFrames,
             stackFrames.creationStackFrames,
             mirror.lastObservedThread,
@@ -44,11 +47,11 @@ class CoroutineLibraryAgent2Proxy(private val executionContext: DefaultExecution
     }
 
     fun isInstalled(): Boolean {
-        try {
-            return debugProbesImpl?.isInstalledValue ?: false
+        return try {
+            debugProbesImpl?.isInstalledValue ?: false
         } catch (e: Exception) {
             log.error("Exception happened while checking agent status.", e)
-            return false
+            false
         }
     }
 
@@ -57,7 +60,11 @@ class CoroutineLibraryAgent2Proxy(private val executionContext: DefaultExecution
         variables: List<XNamedValue>
     ): CoroutineStackFrames {
         val index = frames.indexOfFirst { it.isCreationSeparatorFrame() }
-        val restoredStackFrames = frames.take(index).map {
+        val restoredStackTraceElements = if (index >= 0)
+            frames.take(index)
+        else
+            frames
+        val restoredStackFrames = restoredStackTraceElements.map {
             SuspendCoroutineStackFrameItem(it, locationCache.createLocation(it), variables)
         }
         val creationStackFrames = frames.subList(index + 1, frames.size).mapIndexed { ix, it ->
@@ -74,10 +81,10 @@ class CoroutineLibraryAgent2Proxy(private val executionContext: DefaultExecution
     companion object {
         fun instance(executionContext: DefaultExecutionContext): CoroutineLibraryAgent2Proxy? {
             val agentProxy = CoroutineLibraryAgent2Proxy(executionContext)
-            if (agentProxy.isInstalled())
-                return agentProxy
+            return if (agentProxy.isInstalled())
+                agentProxy
             else
-                return null
+                null
         }
     }
 

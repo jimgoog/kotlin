@@ -12,7 +12,7 @@ public final class User$Creator : java/lang/Object, android/os/Parcelable$Creato
         LABEL (L0)
           ALOAD (1)
           LDC (in)
-          INVOKESTATIC (kotlin/jvm/internal/Intrinsics, checkParameterIsNotNull, (Ljava/lang/Object;Ljava/lang/String;)V)
+          INVOKESTATIC (kotlin/jvm/internal/Intrinsics, checkNotNullParameter, (Ljava/lang/Object;Ljava/lang/String;)V)
         LABEL (L1)
           NEW
           DUP
@@ -73,6 +73,7 @@ public final class User : java/lang/Object, android/os/Parcelable {
     public int describeContents() {
         Local variables:
             0 this: LUser;
+
         LABEL (L0)
           LDC (0)
           IRETURN
@@ -108,7 +109,7 @@ public final class User : java/lang/Object, android/os/Parcelable {
         LABEL (L0)
           ALOAD (1)
           LDC (parcel)
-          INVOKESTATIC (kotlin/jvm/internal/Intrinsics, checkParameterIsNotNull, (Ljava/lang/Object;Ljava/lang/String;)V)
+          INVOKESTATIC (kotlin/jvm/internal/Intrinsics, checkNotNullParameter, (Ljava/lang/Object;Ljava/lang/String;)V)
           ALOAD (1)
           ALOAD (0)
           GETFIELD (firstName, Ljava/lang/String;)

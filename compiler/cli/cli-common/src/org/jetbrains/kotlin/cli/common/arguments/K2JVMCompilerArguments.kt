@@ -70,7 +70,7 @@ class K2JVMCompilerArguments : CommonCompilerArguments() {
     @Argument(
         value = "-jvm-target",
         valueDescription = "<version>",
-        description = "Target version of the generated JVM bytecode (1.6, 1.8, 9, 10, 11, 12 or 13), default is 1.6"
+        description = "Target version of the generated JVM bytecode (1.6, 1.8, 9, 10, 11, 12, 13 or 14), default is 1.6"
     )
     var jvmTarget: String? by NullableStringFreezableVar(JvmTarget.DEFAULT.description)
 
@@ -289,7 +289,6 @@ class K2JVMCompilerArguments : CommonCompilerArguments() {
                                  Note that if interface delegation is used, all interface methods are delegated.
                                  The only exception are methods annotated with the deprecated @JvmDefault annotation.
 -Xjvm-default=disable            Do not generate JVM default methods and prohibit @JvmDefault annotation usage.
- The following modes are DEPRECATED:
 -Xjvm-default=enable             Allow usages of @JvmDefault; only generate the default method
                                  for annotated method in the interface
                                  (annotating an existing method can break binary compatibility)
@@ -363,12 +362,6 @@ class K2JVMCompilerArguments : CommonCompilerArguments() {
         result[AnalysisFlags.ignoreDataFlowInAssert] = JVMAssertionsMode.fromString(assertionsMode) != JVMAssertionsMode.LEGACY
         JvmDefaultMode.fromStringOrNull(jvmDefault)?.let {
             result[JvmAnalysisFlags.jvmDefaultMode] = it
-            if (it == JvmDefaultMode.ENABLE || it == JvmDefaultMode.ENABLE_WITH_DEFAULT_IMPLS) {
-                collector.report(
-                    CompilerMessageSeverity.WARNING,
-                    "'-Xjvm-default=$jvmDefault' mode is deprecated. Please considering to switch to new modes: 'all' and 'all-compatibility'"
-                )
-            }
         } ?: collector.report(
             CompilerMessageSeverity.ERROR,
             "Unknown @JvmDefault mode: $jvmDefault, " +

@@ -262,7 +262,10 @@ class KotlinMetadataTargetConfigurator(kotlinPluginVersion: String) :
         val isNativeSourceSet = platformCompilations.all { compilation -> compilation.target is KotlinNativeTarget }
 
         val compilationFactory: KotlinCompilationFactory<out AbstractKotlinCompilation<*>> = when {
-            isNativeSourceSet -> KotlinSharedNativeCompilationFactory(target)
+            isNativeSourceSet -> KotlinSharedNativeCompilationFactory(
+                target,
+                platformCompilations.map { (it as AbstractKotlinNativeCompilation).konanTarget }
+            )
             else -> KotlinCommonCompilationFactory(target)
         }
 

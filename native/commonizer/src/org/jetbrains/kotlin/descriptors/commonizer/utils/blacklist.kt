@@ -7,16 +7,13 @@ package org.jetbrains.kotlin.descriptors.commonizer.utils
 
 import org.jetbrains.kotlin.descriptors.PackageFragmentDescriptor
 import org.jetbrains.kotlin.descriptors.SimpleFunctionDescriptor
-import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.types.getAbbreviation
-
-private val DEPRECATED_ANNOTATION_FQN = FqName(Deprecated::class.java.name)
 
 internal fun SimpleFunctionDescriptor.isKniBridgeFunction() =
     name.asString().startsWith("kniBridge")
 
-internal fun SimpleFunctionDescriptor.isDeprecated() =
-    annotations.hasAnnotation(DEPRECATED_ANNOTATION_FQN)
+internal fun SimpleFunctionDescriptor.isDeprecatedTopLevelFunction() =
+    containingDeclaration is PackageFragmentDescriptor && annotations.hasAnnotation(DEPRECATED_ANNOTATION_FQN)
 
 // the following logic determines Kotlin functions with conflicting overloads in Darwin library:
 internal fun SimpleFunctionDescriptor.isBlacklistedDarwinFunction(): Boolean {

@@ -90,6 +90,9 @@ class NewProjectWizardModuleBuilder : EmptyModuleBuilder() {
         model: ModifiableModuleModel?,
         modulesProvider: ModulesProvider?
     ): List<IdeaModule>? {
+        runWriteAction {
+            wizard.jdk?.let { jdk -> NewProjectUtil.applyJdkToProject(project, jdk) }
+        }
         val modulesModel = model ?: ModuleManager.getInstance(project).modifiableModel
         val success = wizard.apply(
             services = buildList {
@@ -100,7 +103,7 @@ class NewProjectWizardModuleBuilder : EmptyModuleBuilder() {
             phases = GenerationPhase.startingFrom(GenerationPhase.FIRST_STEP)
         ).onFailure { errors ->
             val errorMessages = errors.joinToString(separator = "\n") { it.message }
-            Messages.showErrorDialog(project, errorMessages, "The following errors arose during project generation")
+            Messages.showErrorDialog(project, errorMessages, KotlinNewProjectWizardUIBundle.message("error.generation"))
         }.isSuccess
         if (success) {
             val projectCreationStats = ProjectCreationStats(

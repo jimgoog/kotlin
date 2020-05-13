@@ -31,7 +31,9 @@ class ExternalDependenciesGenerator(
 ) {
     fun generateUnboundSymbolsAsDependencies() {
         if (languageVersionSettings.supportsFeature(LanguageFeature.NewInference)) {
-            require(symbolTable.unboundTypeParameters.isEmpty()) { "Unbound type parameters are forbidden" }
+            require(symbolTable.unboundTypeParameters.isEmpty()) {
+                "Unbound type parameters are forbidden: ${symbolTable.unboundTypeParameters.map { it.descriptor }}"
+            }
         }
         // There should be at most one DeclarationStubGenerator (none in closed world?)
         irProviders.singleOrNull { it is DeclarationStubGenerator }?.let {
@@ -53,22 +55,6 @@ class ExternalDependenciesGenerator(
             }
         } while (unbound.isNotEmpty())
     }
-
-    private val SymbolTable.allUnbound: List<IrSymbol>
-        get() {
-            val r = mutableListOf<IrSymbol>()
-            r.addAll(unboundClasses)
-            r.addAll(unboundConstructors)
-            r.addAll(unboundEnumEntries)
-            r.addAll(unboundFields)
-            r.addAll(unboundSimpleFunctions)
-            r.addAll(unboundProperties)
-            r.addAll(unboundTypeAliases)
-            if (!languageVersionSettings.supportsFeature(LanguageFeature.NewInference)) {
-                r.addAll(unboundTypeParameters)
-            }
-            return r
-        }
 }
 
 fun List<IrProvider>.getDeclaration(symbol: IrSymbol): IrDeclaration =

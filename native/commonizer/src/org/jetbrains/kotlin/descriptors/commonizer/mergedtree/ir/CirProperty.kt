@@ -10,6 +10,7 @@ import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.descriptors.commonizer.mergedtree.ir.CirGetter.Companion.toGetter
 import org.jetbrains.kotlin.descriptors.commonizer.mergedtree.ir.CirSetter.Companion.toSetter
 import org.jetbrains.kotlin.descriptors.commonizer.utils.Interner
+import org.jetbrains.kotlin.descriptors.commonizer.utils.checkConstantSupportedInCommonization
 import org.jetbrains.kotlin.resolve.constants.ConstantValue
 
 interface CirProperty : CirFunctionOrProperty {
@@ -35,6 +36,7 @@ data class CirCommonProperty(
     override val setter: CirSetter?,
     override val typeParameters: List<CirTypeParameter>
 ) : CirCommonFunctionOrProperty(), CirProperty {
+    override val annotations: List<CirAnnotation> get() = emptyList()
     override val isVar get() = setter != null
     override val isLateInit get() = false
     override val isConst get() = false
@@ -58,7 +60,10 @@ class CirPropertyImpl(original: PropertyDescriptor) : CirFunctionOrPropertyImpl<
 
     init {
         compileTimeInitializer?.let { compileTimeInitializer ->
-            checkSupportedInCommonization(compileTimeInitializer) { "${original::class.java}, $original" }
+            checkConstantSupportedInCommonization(
+                constantValue = compileTimeInitializer,
+                owner = original
+            )
         }
     }
 }

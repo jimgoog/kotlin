@@ -25,7 +25,7 @@ interface ScriptConfigurationUpdater {
     fun ensureConfigurationUpToDate(files: List<KtFile>): Boolean
 
     /**
-     * Invalidate current configuration
+     *  Suggest to update script configuration if configuration for [file] is out of date
      */
-    fun postponeConfigurationReload(scope: ScriptConfigurationCacheScope)
+    fun suggestToUpdateConfigurationIfOutOfDate(file: KtFile)
 }

@@ -70,6 +70,11 @@ public class SlicerTreeTestGenerated extends AbstractSlicerTreeTest {
             runTest("idea/testData/slicer/inflow/compositeAssignments.kt");
         }
 
+        @TestMetadata("dataClassCopy.kt")
+        public void testDataClassCopy() throws Exception {
+            runTest("idea/testData/slicer/inflow/dataClassCopy.kt");
+        }
+
         @TestMetadata("defaultGetterFieldInSetter.kt")
         public void testDefaultGetterFieldInSetter() throws Exception {
             runTest("idea/testData/slicer/inflow/defaultGetterFieldInSetter.kt");
@@ -483,6 +488,11 @@ public class SlicerTreeTestGenerated extends AbstractSlicerTreeTest {
             runTest("idea/testData/slicer/outflow/cast.kt");
         }
 
+        @TestMetadata("dataClassCopy.kt")
+        public void testDataClassCopy() throws Exception {
+            runTest("idea/testData/slicer/outflow/dataClassCopy.kt");
+        }
+
         @TestMetadata("defaultExplicitPrimaryConstructorCalls.kt")
         public void testDefaultExplicitPrimaryConstructorCalls() throws Exception {
             runTest("idea/testData/slicer/outflow/defaultExplicitPrimaryConstructorCalls.kt");
@@ -676,6 +686,11 @@ public class SlicerTreeTestGenerated extends AbstractSlicerTreeTest {
         @TestMetadata("memberPropertyUsages.kt")
         public void testMemberPropertyUsages() throws Exception {
             runTest("idea/testData/slicer/outflow/memberPropertyUsages.kt");
+        }
+
+        @TestMetadata("namedArgumentForConstructorParameter.kt")
+        public void testNamedArgumentForConstructorParameter() throws Exception {
+            runTest("idea/testData/slicer/outflow/namedArgumentForConstructorParameter.kt");
         }
 
         @TestMetadata("nonInlineLetResult.kt")

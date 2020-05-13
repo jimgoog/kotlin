@@ -10,6 +10,8 @@ import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.FirSourceElement
 import org.jetbrains.kotlin.fir.declarations.FirAnonymousObject
 import org.jetbrains.kotlin.fir.declarations.FirDeclaration
+import org.jetbrains.kotlin.fir.declarations.FirDeclarationAttributes
+import org.jetbrains.kotlin.fir.declarations.FirDeclarationOrigin
 import org.jetbrains.kotlin.fir.declarations.FirResolvePhase
 import org.jetbrains.kotlin.fir.declarations.FirTypeParameterRef
 import org.jetbrains.kotlin.fir.expressions.FirAnnotationCall
@@ -29,6 +31,7 @@ internal class FirAnonymousObjectImpl(
     override val source: FirSourceElement?,
     override val session: FirSession,
     override var resolvePhase: FirResolvePhase,
+    override val origin: FirDeclarationOrigin,
     override val typeParameters: MutableList<FirTypeParameterRef>,
     override val classKind: ClassKind,
     override val superTypeRefs: MutableList<FirTypeRef>,
@@ -38,6 +41,7 @@ internal class FirAnonymousObjectImpl(
     override var typeRef: FirTypeRef,
     override val symbol: FirAnonymousObjectSymbol,
 ) : FirAnonymousObject() {
+    override val attributes: FirDeclarationAttributes = FirDeclarationAttributes()
     override var controlFlowGraphReference: FirControlFlowGraphReference = FirEmptyControlFlowGraphReference
 
     init {
@@ -55,11 +59,16 @@ internal class FirAnonymousObjectImpl(
 
     override fun <D> transformChildren(transformer: FirTransformer<D>, data: D): FirAnonymousObjectImpl {
         typeParameters.transformInplace(transformer, data)
-        superTypeRefs.transformInplace(transformer, data)
+        transformSuperTypeRefs(transformer, data)
         transformDeclarations(transformer, data)
         transformAnnotations(transformer, data)
         typeRef = typeRef.transformSingle(transformer, data)
         transformControlFlowGraphReference(transformer, data)
+        return this
+    }
+
+    override fun <D> transformSuperTypeRefs(transformer: FirTransformer<D>, data: D): FirAnonymousObjectImpl {
+        superTypeRefs.transformInplace(transformer, data)
         return this
     }
 

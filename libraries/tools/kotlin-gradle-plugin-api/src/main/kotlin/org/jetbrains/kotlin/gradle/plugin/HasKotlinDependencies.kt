@@ -64,6 +64,20 @@ interface KotlinDependencyHandler {
         message = "Use npm(name, version) instead. Name like in package.json"
     )
     fun npm(org: String? = null, packageName: String, version: String = "*"): Dependency
+
+    fun devNpm(name: String, version: String = "*"): Dependency
+
+    fun devNpm(name: String, directory: File): Dependency
+
+    fun devNpm(directory: File): Dependency
+
+    fun optionalNpm(name: String, version: String = "*"): Dependency
+
+    fun optionalNpm(name: String, directory: File): Dependency
+
+    fun optionalNpm(directory: File): Dependency
+
+    fun peerNpm(name: String, version: String = "*"): Dependency
 }
 
 interface HasKotlinDependencies {

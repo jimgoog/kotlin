@@ -1247,6 +1247,11 @@ public class Fir2IrTextTestGenerated extends AbstractFir2IrTextTest {
             runTest("compiler/testData/ir/irText/expressions/stringTemplates.kt");
         }
 
+        @TestMetadata("suspendConversionOnArbitraryExpression.kt")
+        public void testSuspendConversionOnArbitraryExpression() throws Exception {
+            runTest("compiler/testData/ir/irText/expressions/suspendConversionOnArbitraryExpression.kt");
+        }
+
         @TestMetadata("temporaryInEnumEntryInitializer.kt")
         public void testTemporaryInEnumEntryInitializer() throws Exception {
             runTest("compiler/testData/ir/irText/expressions/temporaryInEnumEntryInitializer.kt");
@@ -1404,6 +1409,11 @@ public class Fir2IrTextTestGenerated extends AbstractFir2IrTextTest {
                 KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/ir/irText/expressions/callableReferences"), Pattern.compile("^(.+)\\.kt$"), null, true);
             }
 
+            @TestMetadata("boundInlineAdaptedReference.kt")
+            public void testBoundInlineAdaptedReference() throws Exception {
+                runTest("compiler/testData/ir/irText/expressions/callableReferences/boundInlineAdaptedReference.kt");
+            }
+
             @TestMetadata("boundInnerGenericConstructor.kt")
             public void testBoundInnerGenericConstructor() throws Exception {
                 runTest("compiler/testData/ir/irText/expressions/callableReferences/boundInnerGenericConstructor.kt");
@@ -1437,6 +1447,11 @@ public class Fir2IrTextTestGenerated extends AbstractFir2IrTextTest {
             @TestMetadata("kt37131.kt")
             public void testKt37131() throws Exception {
                 runTest("compiler/testData/ir/irText/expressions/callableReferences/kt37131.kt");
+            }
+
+            @TestMetadata("suspendConversion.kt")
+            public void testSuspendConversion() throws Exception {
+                runTest("compiler/testData/ir/irText/expressions/callableReferences/suspendConversion.kt");
             }
 
             @TestMetadata("typeArguments.kt")

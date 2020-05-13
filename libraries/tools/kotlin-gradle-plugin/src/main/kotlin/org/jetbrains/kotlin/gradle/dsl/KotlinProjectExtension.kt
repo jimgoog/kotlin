@@ -11,7 +11,6 @@ import org.gradle.api.Project
 import org.gradle.api.internal.plugins.DslObject
 import org.gradle.util.ConfigureUtil
 import org.jetbrains.kotlin.gradle.plugin.*
-import org.jetbrains.kotlin.gradle.plugin.KotlinJsCompilerType.*
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinAndroidTarget
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinJsSingleTargetPreset
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinWithJavaTarget
@@ -128,13 +127,13 @@ open class KotlinJsProjectExtension :
 
         if (_target == null) {
             val target: KotlinJsTargetDsl = when (compiler ?: defaultJsCompilerType) {
-                LEGACY -> legacyPreset
+                KotlinJsCompilerType.LEGACY -> legacyPreset
                     .also { it.irPreset = null }
                     .createTarget("js")
-                IR -> irPreset
+                KotlinJsCompilerType.IR -> irPreset
                     .also { it.mixedMode = false }
                     .createTarget("js")
-                BOTH -> legacyPreset
+                KotlinJsCompilerType.BOTH -> legacyPreset
                     .also {
                         irPreset.mixedMode = true
                         it.irPreset = irPreset
@@ -163,12 +162,25 @@ open class KotlinJsProjectExtension :
     ): KotlinJsTargetDsl = jsInternal(compiler, body)
 
     fun js(
+        compiler: String,
+        body: KotlinJsTargetDsl.() -> Unit = { }
+    ): KotlinJsTargetDsl = js(
+        KotlinJsCompilerType.byArgument(compiler),
+        body
+    )
+
+    fun js(
         body: KotlinJsTargetDsl.() -> Unit = { }
     ) = jsInternal(body = body)
 
     fun js() = js { }
 
     fun js(compiler: KotlinJsCompilerType, configure: Closure<*>) =
+        js(compiler = compiler) {
+            ConfigureUtil.configure(configure, this)
+        }
+
+    fun js(compiler: String, configure: Closure<*>) =
         js(compiler = compiler) {
             ConfigureUtil.configure(configure, this)
         }
@@ -184,8 +196,11 @@ open class KotlinJsProjectExtension :
         "Needed for IDE import using the MPP import mechanism",
         level = DeprecationLevel.HIDDEN
     )
-    fun getTargets() =
-        target.project.container(KotlinTarget::class.java).apply { add(target) }
+    fun getTargets(): NamedDomainObjectContainer<KotlinTarget>? =
+        _target?.let { target ->
+            target.project.container(KotlinTarget::class.java)
+                .apply { add(target) }
+        }
 }
 
 open class KotlinCommonProjectExtension : KotlinSingleJavaTargetExtension() {

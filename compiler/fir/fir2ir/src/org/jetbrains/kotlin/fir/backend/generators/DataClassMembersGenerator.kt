@@ -7,7 +7,26 @@ package org.jetbrains.kotlin.fir.backend.generators
 
 import org.jetbrains.kotlin.descriptors.*
 import org.jetbrains.kotlin.fir.backend.Fir2IrComponents
+import org.jetbrains.kotlin.fir.backend.FirMetadataSource
+import org.jetbrains.kotlin.descriptors.CallableDescriptor
+import org.jetbrains.kotlin.descriptors.FunctionDescriptor
+import org.jetbrains.kotlin.descriptors.Modality
+import org.jetbrains.kotlin.descriptors.Visibilities
+import org.jetbrains.kotlin.fir.backend.*
 import org.jetbrains.kotlin.fir.backend.declareThisReceiverParameter
+import org.jetbrains.kotlin.fir.declarations.FirClass
+import org.jetbrains.kotlin.fir.declarations.builder.buildSimpleFunction
+import org.jetbrains.kotlin.fir.declarations.builder.buildValueParameter
+import org.jetbrains.kotlin.fir.declarations.impl.FirDeclarationStatusImpl
+import org.jetbrains.kotlin.fir.symbols.CallableId
+import org.jetbrains.kotlin.fir.symbols.impl.FirNamedFunctionSymbol
+import org.jetbrains.kotlin.fir.symbols.impl.FirVariableSymbol
+import org.jetbrains.kotlin.fir.types.impl.FirImplicitBooleanTypeRef
+import org.jetbrains.kotlin.fir.types.impl.FirImplicitIntTypeRef
+import org.jetbrains.kotlin.fir.types.impl.FirImplicitNullableAnyTypeRef
+import org.jetbrains.kotlin.fir.types.impl.FirImplicitStringTypeRef
+import org.jetbrains.kotlin.fir.declarations.*
+import org.jetbrains.kotlin.incremental.components.NoLookupLocation
 import org.jetbrains.kotlin.ir.UNDEFINED_OFFSET
 import org.jetbrains.kotlin.ir.builders.IrGeneratorContextBase
 import org.jetbrains.kotlin.ir.declarations.*
@@ -19,30 +38,27 @@ import org.jetbrains.kotlin.ir.expressions.IrMemberAccessExpression
 import org.jetbrains.kotlin.ir.types.IrType
 import org.jetbrains.kotlin.ir.util.*
 import org.jetbrains.kotlin.ir.util.DataClassMembersGenerator
+import org.jetbrains.kotlin.ir.util.defaultType
+import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.Name
 
 class DataClassMembersGenerator(val components: Fir2IrComponents) {
 
-    // TODO: generateInlineClassMembers
+    fun generateInlineClassMembers(klass: FirClass<*>, irClass: IrClass): List<Name> =
+        MyDataClassMethodsGenerator(irClass, klass.symbol.classId, IrDeclarationOrigin.GENERATED_INLINE_CLASS_MEMBER).generate(klass)
 
-    fun generateDataClassMembers(irClass: IrClass): List<Name> =
-        MyDataClassMethodsGenerator(irClass, IrDeclarationOrigin.GENERATED_DATA_CLASS_MEMBER).generate()
+    fun generateDataClassMembers(klass: FirClass<*>, irClass: IrClass): List<Name> =
+        MyDataClassMethodsGenerator(irClass, klass.symbol.classId, IrDeclarationOrigin.GENERATED_DATA_CLASS_MEMBER).generate(klass)
 
-    fun generateDataClassComponentBody(irFunction: IrFunction) =
-        MyDataClassMethodsGenerator(irFunction.parentAsClass, IrDeclarationOrigin.GENERATED_DATA_CLASS_MEMBER)
+    fun generateDataClassComponentBody(irFunction: IrFunction, classId: ClassId) =
+        MyDataClassMethodsGenerator(irFunction.parentAsClass, classId, IrDeclarationOrigin.GENERATED_DATA_CLASS_MEMBER)
             .generateComponentBody(irFunction)
 
-    fun generateDataClassCopyBody(irFunction: IrFunction) =
-        MyDataClassMethodsGenerator(irFunction.parentAsClass, IrDeclarationOrigin.GENERATED_DATA_CLASS_MEMBER)
+    fun generateDataClassCopyBody(irFunction: IrFunction, classId: ClassId) =
+        MyDataClassMethodsGenerator(irFunction.parentAsClass, classId, IrDeclarationOrigin.GENERATED_DATA_CLASS_MEMBER)
             .generateCopyBody(irFunction)
 
-
-    private inner class MyDataClassMethodsGenerator(
-        val irClass: IrClass,
-        val origin: IrDeclarationOrigin
-    ) {
-        val properties = irClass.declarations.filterIsInstance<IrProperty>().map { it.descriptor }
-
+    private inner class MyDataClassMethodsGenerator(val irClass: IrClass, val classId: ClassId, val origin: IrDeclarationOrigin) {
         private val irDataClassMembersGenerator = object : DataClassMembersGenerator(
             IrGeneratorContextBase(components.irBuiltIns),
             components.symbolTable,
@@ -85,38 +101,92 @@ class DataClassMembersGenerator(val components: Fir2IrComponents) {
                 valueParameterDescriptor.bind(this)
             }
 
-        fun generate(): List<Name> {
+
+        private val FirSimpleFunction.matchesEqualsSignature: Boolean
+            get() = valueParameters.size == 1 &&
+                    valueParameters[0].returnTypeRef.toIrType(components.typeConverter) == components.irBuiltIns.anyNType &&
+                    returnTypeRef.toIrType(components.typeConverter) == components.irBuiltIns.booleanType
+
+        private val FirSimpleFunction.matchesHashCodeSignature: Boolean
+            get() = valueParameters.isEmpty() &&
+                    returnTypeRef.toIrType(components.typeConverter) == components.irBuiltIns.intType
+
+        private val FirSimpleFunction.matchesToStringSignature: Boolean
+            get() = valueParameters.isEmpty() &&
+                    returnTypeRef.toIrType(components.typeConverter) == components.irBuiltIns.stringType
+
+        private val FirSimpleFunction.matchesDataClassSyntheticMemberSignatures: Boolean
+            get() = (this.name == equalsName && matchesEqualsSignature) ||
+                    (this.name == hashCodeName && matchesHashCodeSignature) ||
+                    (this.name == toStringName && matchesToStringSignature)
+
+        fun generate(klass: FirClass<*>): List<Name> {
+            val propertyParametersCount = irClass.primaryConstructor?.explicitParameters?.size ?: 0
+            val properties = irClass.declarations
+                .filterIsInstance<IrProperty>()
+                .take(propertyParametersCount)
+                .map { it.descriptor }
             if (properties.isEmpty()) {
                 return emptyList()
             }
 
-            // TODO: generate equals, hashCode, and toString only if needed
-            val equalsFunction = createSyntheticIrFunction(
-                Name.identifier("equals"),
-                components.irBuiltIns.booleanType
-            ).apply {
-                valueParameters = listOf(
-                    createSyntheticIrParameter(this, Name.identifier("other"), components.irBuiltIns.anyNType)
-                )
+            val result = mutableListOf<Name>()
+
+            val contributedFunctionsInThisType = klass.declarations.mapNotNull {
+                if (it is FirSimpleFunction && it.matchesDataClassSyntheticMemberSignatures) {
+                    it.name
+                } else
+                    null
             }
-            irDataClassMembersGenerator.generateEqualsMethod(equalsFunction, properties)
-            irClass.declarations.add(equalsFunction)
+            val nonOverridableContributedFunctionsInSupertypes =
+                klass.collectContributedFunctionsFromSupertypes(components.session) { declaration, map ->
+                    if (declaration is FirSimpleFunction &&
+                        declaration.body != null &&
+                        !Visibilities.isPrivate(declaration.visibility) &&
+                        declaration.modality == Modality.FINAL &&
+                        declaration.matchesDataClassSyntheticMemberSignatures
+                    ) {
+                        map.putIfAbsent(declaration.name, declaration)
+                    }
+                }
 
-            val hashCodeFunction = createSyntheticIrFunction(
-                Name.identifier("hashCode"),
-                components.irBuiltIns.intType
-            )
-            irDataClassMembersGenerator.generateHashCodeMethod(hashCodeFunction, properties)
-            irClass.declarations.add(hashCodeFunction)
+            if (!contributedFunctionsInThisType.contains(equalsName) &&
+                !nonOverridableContributedFunctionsInSupertypes.containsKey(equalsName)
+            ) {
+                result.add(equalsName)
+                val equalsFunction = createSyntheticIrFunction(
+                    equalsName,
+                    components.irBuiltIns.booleanType,
+                ) { createSyntheticIrParameter(it, Name.identifier("other"), components.irBuiltIns.anyNType) }
+                irDataClassMembersGenerator.generateEqualsMethod(equalsFunction, properties)
+                irClass.declarations.add(equalsFunction)
+            }
 
-            val toStringFunction = createSyntheticIrFunction(
-                Name.identifier("toString"),
-                components.irBuiltIns.stringType
-            )
-            irDataClassMembersGenerator.generateToStringMethod(toStringFunction, properties)
-            irClass.declarations.add(toStringFunction)
+            if (!contributedFunctionsInThisType.contains(hashCodeName) &&
+                !nonOverridableContributedFunctionsInSupertypes.containsKey(hashCodeName)
+            ) {
+                result.add(hashCodeName)
+                val hashCodeFunction = createSyntheticIrFunction(
+                    hashCodeName,
+                    components.irBuiltIns.intType,
+                )
+                irDataClassMembersGenerator.generateHashCodeMethod(hashCodeFunction, properties)
+                irClass.declarations.add(hashCodeFunction)
+            }
 
-            return listOf(equalsFunction.name, hashCodeFunction.name, toStringFunction.name)
+            if (!contributedFunctionsInThisType.contains(toStringName) &&
+                !nonOverridableContributedFunctionsInSupertypes.containsKey(toStringName)
+            ) {
+                result.add(toStringName)
+                val toStringFunction = createSyntheticIrFunction(
+                    toStringName,
+                    components.irBuiltIns.stringType,
+                )
+                irDataClassMembersGenerator.generateToStringMethod(toStringFunction, properties)
+                irClass.declarations.add(toStringFunction)
+            }
+
+            return result
         }
 
         fun generateComponentBody(irFunction: IrFunction) {
@@ -130,7 +200,11 @@ class DataClassMembersGenerator(val components: Fir2IrComponents) {
         fun generateCopyBody(irFunction: IrFunction) =
             irDataClassMembersGenerator.generateCopyFunction(irFunction, irClass.primaryConstructor!!.symbol)
 
-        private fun createSyntheticIrFunction(name: Name, returnType: IrType): IrFunction {
+        private fun createSyntheticIrFunction(
+            name: Name,
+            returnType: IrType,
+            valueParameterBuilder: (IrFunction) -> IrValueParameter? = { null }
+        ): IrFunction {
             val functionDescriptor = WrappedSimpleFunctionDescriptor()
             val thisReceiverDescriptor = WrappedValueParameterDescriptor()
             return components.symbolTable.declareSimpleFunction(UNDEFINED_OFFSET, UNDEFINED_OFFSET, origin, functionDescriptor) { symbol ->
@@ -151,12 +225,52 @@ class DataClassMembersGenerator(val components: Fir2IrComponents) {
                     isFakeOverride = false,
                     isOperator = false
                 ).apply {
-                    metadata = MetadataSource.Function(functionDescriptor)
+                    val irValueParameter = valueParameterBuilder(this)?.let {
+                        this.valueParameters = listOf(it)
+                        it
+                    }
+                    metadata = FirMetadataSource.Function(
+                        buildSimpleFunction {
+                            origin = FirDeclarationOrigin.Synthetic
+                            this.name = name
+                            this.symbol = FirNamedFunctionSymbol(CallableId(classId.packageFqName, classId.relativeClassName, name))
+                            this.status = FirDeclarationStatusImpl(Visibilities.PUBLIC, Modality.FINAL)
+                            this.session = components.session
+                            this.returnTypeRef = when (returnType) {
+                                components.irBuiltIns.booleanType -> FirImplicitBooleanTypeRef(null)
+                                components.irBuiltIns.intType -> FirImplicitIntTypeRef(null)
+                                components.irBuiltIns.stringType -> FirImplicitStringTypeRef(null)
+                                else -> throw AssertionError("Should not be here")
+                            }
+                            if (irValueParameter != null) {
+                                this.valueParameters.add(
+                                    buildValueParameter {
+                                        this.name = irValueParameter.name
+                                        origin = FirDeclarationOrigin.Synthetic
+                                        this.session = components.session
+                                        this.returnTypeRef = FirImplicitNullableAnyTypeRef(null)
+                                        this.symbol = FirVariableSymbol(irValueParameter.name)
+                                        isCrossinline = false
+                                        isNoinline = false
+                                        isVararg = false
+                                    }
+                                )
+                            }
+                        },
+                        descriptor
+                    )
+
                 }
             }.apply {
                 parent = irClass
                 functionDescriptor.bind(this)
                 dispatchReceiverParameter = generateDispatchReceiverParameter(this, thisReceiverDescriptor)
+                components.irBuiltIns.anyClass.descriptor.unsubstitutedMemberScope
+                    .getContributedFunctions(this.name, NoLookupLocation.FROM_BACKEND)
+                    .singleOrNull { function -> function.name == this.name }
+                    ?.let {
+                        overriddenSymbols = listOf(components.symbolTable.referenceSimpleFunction(it))
+                    }
             }
         }
 
@@ -190,6 +304,9 @@ class DataClassMembersGenerator(val components: Fir2IrComponents) {
 
     companion object {
         private val copyName = Name.identifier("copy")
+        private val equalsName = Name.identifier("equals")
+        private val hashCodeName = Name.identifier("hashCode")
+        private val toStringName = Name.identifier("toString")
 
         fun isCopy(irFunction: IrFunction): Boolean =
             irFunction.name == copyName

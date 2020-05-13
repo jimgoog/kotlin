@@ -12,6 +12,7 @@ import org.jetbrains.kotlin.KtNodeTypes.*
 import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.descriptors.Visibilities
+import org.jetbrains.kotlin.descriptors.Visibility
 import org.jetbrains.kotlin.descriptors.annotations.AnnotationUseSiteTarget
 import org.jetbrains.kotlin.fir.*
 import org.jetbrains.kotlin.fir.builder.Context
@@ -88,6 +89,7 @@ class DeclarationsConverter(
 
         return buildFile {
             source = file.toFirSourceElement()
+            origin = FirDeclarationOrigin.Source
             session = baseSession
             name = fileName
             packageFqName = context.packageFqName
@@ -191,13 +193,13 @@ class DeclarationsConverter(
     /**
      * @see org.jetbrains.kotlin.parsing.KotlinParsing.parseModifierList
      */
-    private fun convertModifierList(modifiers: LighterASTNode): Modifier {
+    private fun convertModifierList(modifiers: LighterASTNode, isInClass: Boolean = false): Modifier {
         val modifier = Modifier()
         modifiers.forEachChildren {
             when (it.tokenType) {
                 ANNOTATION -> modifier.annotations += convertAnnotation(it)
                 ANNOTATION_ENTRY -> modifier.annotations += convertAnnotationEntry(it)
-                is KtModifierKeywordToken -> modifier.addModifier(it)
+                is KtModifierKeywordToken -> modifier.addModifier(it, isInClass)
             }
         }
         return modifier
@@ -343,7 +345,7 @@ class DeclarationsConverter(
         var typeParameterList: LighterASTNode? = null
         classNode.forEachChildren {
             when (it.tokenType) {
-                MODIFIER_LIST -> modifiers = convertModifierList(it)
+                MODIFIER_LIST -> modifiers = convertModifierList(it, isInClass = true)
                 CLASS_KEYWORD -> classKind = ClassKind.CLASS
                 INTERFACE_KEYWORD -> classKind = ClassKind.INTERFACE
                 OBJECT_KEYWORD -> classKind = ClassKind.OBJECT
@@ -378,8 +380,8 @@ class DeclarationsConverter(
                     isActual = modifiers.hasActual()
                     isInner = modifiers.isInner()
                     isCompanion = modifiers.isCompanion() && classKind == ClassKind.OBJECT
-                    isData = modifiers.isDataClass() && classKind != ClassKind.OBJECT
-                    isInline = modifiers.hasInline()
+                    isData = modifiers.isDataClass()
+                    isInline = modifiers.isInlineClass()
                 }
 
                 val classBuilder = if (status.modality == Modality.SEALED) {
@@ -391,6 +393,7 @@ class DeclarationsConverter(
                 classBuilder.apply {
                     source = classNode.toFirSourceElement()
                     session = baseSession
+                    origin = FirDeclarationOrigin.Source
                     name = className
                     this.status = status
                     this.classKind = classKind
@@ -526,6 +529,7 @@ class DeclarationsConverter(
         return withChildClassName(ANONYMOUS_OBJECT_NAME) {
             buildAnonymousObject {
                 source = objectLiteral.toFirSourceElement()
+                origin = FirDeclarationOrigin.Source
                 session = baseSession
                 classKind = ClassKind.OBJECT
                 scopeProvider = baseScopeProvider
@@ -578,6 +582,7 @@ class DeclarationsConverter(
         return buildEnumEntry {
             source = enumEntry.toFirSourceElement()
             session = baseSession
+            origin = FirDeclarationOrigin.Source
             returnTypeRef = classWrapper.delegatedSelfTypeRef
             name = enumEntryName
             symbol = FirVariableSymbol(CallableId(context.currentClassId, enumEntryName))
@@ -593,6 +598,7 @@ class DeclarationsConverter(
                 buildAnonymousObject {
                     source = this@buildEnumEntry.source
                     session = baseSession
+                    origin = FirDeclarationOrigin.Source
                     classKind = ClassKind.ENUM_ENTRY
                     scopeProvider = baseScopeProvider
                     symbol = FirAnonymousObjectSymbol()
@@ -659,7 +665,11 @@ class DeclarationsConverter(
      * @see org.jetbrains.kotlin.parsing.KotlinParsing.parseClassOrObject
      * primaryConstructor branch
      */
-    private fun convertPrimaryConstructor(primaryConstructor: LighterASTNode?, classWrapper: ClassWrapper, delegatedConstructorSource: FirLightSourceElement?): PrimaryConstructor? {
+    private fun convertPrimaryConstructor(
+        primaryConstructor: LighterASTNode?,
+        classWrapper: ClassWrapper,
+        delegatedConstructorSource: FirLightSourceElement?
+    ): PrimaryConstructor? {
         if (primaryConstructor == null && !classWrapper.isEnumEntry() && classWrapper.hasSecondaryConstructor) return null
         if (classWrapper.isInterface()) return null
 
@@ -693,6 +703,7 @@ class DeclarationsConverter(
             buildPrimaryConstructor {
                 source = primaryConstructor?.toFirSourceElement()
                 session = baseSession
+                origin = FirDeclarationOrigin.Source
                 returnTypeRef = classWrapper.delegatedSelfTypeRef
                 this.status = status
                 symbol = FirConstructorSymbol(callableIdForClassConstructor())
@@ -719,6 +730,7 @@ class DeclarationsConverter(
         return buildAnonymousInitializer {
             source = anonymousInitializer.toFirSourceElement()
             session = baseSession
+            origin = FirDeclarationOrigin.Source
             body = if (stubMode) buildEmptyExpressionBlock() else firBlock
         }
     }
@@ -756,6 +768,7 @@ class DeclarationsConverter(
         return buildConstructor {
             source = secondaryConstructor.toFirSourceElement()
             session = baseSession
+            origin = FirDeclarationOrigin.Source
             returnTypeRef = delegatedSelfTypeRef
             this.status = status
             symbol = FirConstructorSymbol(callableIdForClassConstructor())
@@ -828,6 +841,7 @@ class DeclarationsConverter(
             return@withChildClassName buildTypeAlias {
                 source = typeAlias.toFirSourceElement()
                 session = baseSession
+                origin = FirDeclarationOrigin.Source
                 name = typeAliasName
                 status = FirDeclarationStatusImpl(modifiers.getVisibility(), Modality.FINAL).apply {
                     isExpect = modifiers.hasExpect()
@@ -885,6 +899,7 @@ class DeclarationsConverter(
         return buildProperty {
             source = propertySource
             session = baseSession
+            origin = FirDeclarationOrigin.Source
             returnTypeRef = returnType
             name = propertyName
             this.isVar = isVar
@@ -929,7 +944,8 @@ class DeclarationsConverter(
                         }
                     }
 
-                    status = FirDeclarationStatusImpl(modifiers.getVisibility(), modifiers.getModality()).apply {
+                    val propertyVisibility = modifiers.getVisibility()
+                    status = FirDeclarationStatusImpl(propertyVisibility, modifiers.getModality()).apply {
                         isExpect = modifiers.hasExpect()
                         isActual = modifiers.hasActual()
                         isOverride = modifiers.hasOverride()
@@ -938,13 +954,13 @@ class DeclarationsConverter(
                     }
 
 
-                    val convertedAccessors = accessors.map { convertGetterOrSetter(it, returnType) }
+                    val convertedAccessors = accessors.map { convertGetterOrSetter(it, returnType, propertyVisibility) }
                     this.getter = convertedAccessors.find { it.isGetter }
-                        ?: FirDefaultPropertyGetter(null, session, returnType, modifiers.getVisibility())
+                        ?: FirDefaultPropertyGetter(null, session, FirDeclarationOrigin.Source, returnType, propertyVisibility)
                     this.setter =
                         if (isVar) {
                             convertedAccessors.find { it.isSetter }
-                                ?: FirDefaultPropertySetter(null, session, returnType, modifiers.getVisibility())
+                                ?: FirDefaultPropertySetter(null, session, FirDeclarationOrigin.Source, returnType, propertyVisibility)
                         } else null
 
                     val receiver = delegateExpression?.let {
@@ -1003,6 +1019,7 @@ class DeclarationsConverter(
         return buildProperty {
             source = entry.toFirSourceElement()
             session = baseSession
+            origin = FirDeclarationOrigin.Source
             returnTypeRef = firType ?: implicitType
             this.name = name
             isVar = false
@@ -1016,12 +1033,17 @@ class DeclarationsConverter(
     /**
      * @see org.jetbrains.kotlin.parsing.KotlinParsing.parsePropertyGetterOrSetter
      */
-    private fun convertGetterOrSetter(getterOrSetter: LighterASTNode, propertyTypeRef: FirTypeRef): FirPropertyAccessor {
+    private fun convertGetterOrSetter(
+        getterOrSetter: LighterASTNode,
+        propertyTypeRef: FirTypeRef,
+        propertyVisibility: Visibility
+    ): FirPropertyAccessor {
         var modifiers = Modifier()
         var isGetter = true
         var returnType: FirTypeRef? = null
         var firValueParameters: FirValueParameter = buildDefaultSetterValueParameter {
             session = baseSession
+            origin = FirDeclarationOrigin.Source
             returnTypeRef = propertyTypeRef
             symbol = FirVariableSymbol(NAME_FOR_DEFAULT_VALUE_PARAMETER)
         }
@@ -1039,10 +1061,21 @@ class DeclarationsConverter(
             }
         }
 
+        var accessorVisibility = modifiers.getVisibility()
+        if (accessorVisibility == Visibilities.UNKNOWN) {
+            accessorVisibility = propertyVisibility
+        }
         val sourceElement = getterOrSetter.toFirSourceElement()
         if (block == null && expression == null) {
             return FirDefaultPropertyAccessor
-                .createGetterOrSetter(sourceElement, baseSession, propertyTypeRef, modifiers.getVisibility(), isGetter)
+                .createGetterOrSetter(
+                    sourceElement,
+                    baseSession,
+                    FirDeclarationOrigin.Source,
+                    propertyTypeRef,
+                    accessorVisibility,
+                    isGetter
+                )
                 .also {
                     it.annotations += modifiers.annotations
                 }
@@ -1051,10 +1084,11 @@ class DeclarationsConverter(
         return buildPropertyAccessor {
             source = sourceElement
             session = baseSession
+            origin = FirDeclarationOrigin.Source
             returnTypeRef = returnType ?: if (isGetter) propertyTypeRef else implicitUnitType
             symbol = FirPropertyAccessorSymbol()
             this.isGetter = isGetter
-            status = FirDeclarationStatusImpl(modifiers.getVisibility(), Modality.FINAL)
+            status = FirDeclarationStatusImpl(accessorVisibility, Modality.FINAL)
             context.firFunctionTargets += target
             annotations += modifiers.annotations
 
@@ -1092,6 +1126,7 @@ class DeclarationsConverter(
         return buildValueParameter {
             source = setterParameter.toFirSourceElement()
             session = baseSession
+            origin = FirDeclarationOrigin.Source
             returnTypeRef = if (firValueParameter.returnTypeRef == implicitType) propertyTypeRef else firValueParameter.returnTypeRef
             name = firValueParameter.name
             symbol = FirVariableSymbol(firValueParameter.name)
@@ -1180,6 +1215,7 @@ class DeclarationsConverter(
 
         return functionBuilder.apply {
             session = baseSession
+            origin = FirDeclarationOrigin.Source
             returnTypeRef = returnType!!
 
             context.firFunctionTargets += target
@@ -1382,6 +1418,7 @@ class DeclarationsConverter(
         return buildTypeParameter {
             source = typeParameter.toFirSourceElement()
             session = baseSession
+            origin = FirDeclarationOrigin.Source
             name = identifier.nameAsSafeName()
             symbol = FirTypeParameterSymbol()
             variance = typeParameterModifiers.getVariance()
@@ -1592,6 +1629,7 @@ class DeclarationsConverter(
         val firValueParameter = buildValueParameter {
             source = valueParameter.toFirSourceElement()
             session = baseSession
+            origin = FirDeclarationOrigin.Source
             returnTypeRef = firType ?: implicitType
             this.name = name
             symbol = FirVariableSymbol(name)

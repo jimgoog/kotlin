@@ -22,6 +22,7 @@ import org.jetbrains.kotlin.fir.references.builder.buildExplicitSuperReference
 import org.jetbrains.kotlin.fir.references.builder.buildSimpleNamedReference
 import org.jetbrains.kotlin.fir.references.impl.FirSimpleNamedReference
 import org.jetbrains.kotlin.fir.resolve.*
+import org.jetbrains.kotlin.fir.resolve.calls.ImplicitDispatchReceiverValue
 import org.jetbrains.kotlin.fir.resolve.calls.candidate
 import org.jetbrains.kotlin.fir.resolve.diagnostics.*
 import org.jetbrains.kotlin.fir.resolve.transformers.InvocationKindTransformer
@@ -34,7 +35,6 @@ import org.jetbrains.kotlin.fir.symbols.impl.FirVariableSymbol
 import org.jetbrains.kotlin.fir.symbols.invoke
 import org.jetbrains.kotlin.fir.types.*
 import org.jetbrains.kotlin.fir.types.builder.*
-import org.jetbrains.kotlin.fir.types.impl.ConeClassLikeTypeImpl
 import org.jetbrains.kotlin.fir.visitors.*
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.Name
@@ -80,6 +80,13 @@ class FirExpressionsResolveTransformer(transformer: FirBodyResolveTransformer) :
                 qualifiedAccessExpression
             }
             is FirSuperReference -> {
+                val labelName = callee.labelName
+                val implicitReceiver =
+                    if (labelName != null) implicitReceiverStack[labelName] as? ImplicitDispatchReceiverValue
+                    else implicitReceiverStack.lastDispatchReceiver()
+                implicitReceiver?.receiverExpression?.let {
+                    qualifiedAccessExpression.transformDispatchReceiver(StoreReceiver, it)
+                }
                 when (val superTypeRef = callee.superTypeRef) {
                     is FirResolvedTypeRef -> {
                         qualifiedAccessExpression.resultType = superTypeRef
@@ -89,7 +96,7 @@ class FirExpressionsResolveTransformer(transformer: FirBodyResolveTransformer) :
                         qualifiedAccessExpression.resultType = callee.superTypeRef
                     }
                     else -> {
-                        val superTypeRefs = implicitReceiverStack.lastDispatchReceiver()?.boundSymbol?.phasedFir?.superTypeRefs
+                        val superTypeRefs = implicitReceiver?.boundSymbol?.phasedFir?.superTypeRefs
                         val resultType = when {
                             superTypeRefs?.isNotEmpty() != true -> {
                                 buildErrorTypeRef {
@@ -637,7 +644,8 @@ class FirExpressionsResolveTransformer(transformer: FirBodyResolveTransformer) :
                 context.implicitReceiverStack.add(name, lastDispatchReceiver)
             }
             val typeArguments: List<FirTypeProjection>
-            val symbol: FirClassSymbol<*> = when (val reference = delegatedConstructorCall.calleeReference) {
+            val reference = delegatedConstructorCall.calleeReference
+            val symbol: FirClassSymbol<*> = when (reference) {
                 is FirThisReference -> {
                     typeArguments = emptyList()
                     if (reference.boundSymbol == null) {
@@ -667,7 +675,11 @@ class FirExpressionsResolveTransformer(transformer: FirBodyResolveTransformer) :
             }
             val resolvedCall = callResolver.resolveDelegatingConstructorCall(delegatedConstructorCall, symbol, typeArguments)
                 ?: return delegatedConstructorCall.compose()
-
+            if (reference is FirThisReference && reference.boundSymbol == null) {
+                resolvedCall.dispatchReceiver.typeRef.coneTypeSafe<ConeClassLikeType>()?.lookupTag?.toSymbol(session)?.let {
+                    reference.replaceBoundSymbol(it)
+                }
+            }
 
             val completionResult = callCompleter.completeCall(resolvedCall, noExpectedType)
             result = completionResult.result

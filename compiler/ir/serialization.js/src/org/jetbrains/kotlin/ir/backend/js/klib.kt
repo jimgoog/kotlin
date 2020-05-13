@@ -27,10 +27,14 @@ import org.jetbrains.kotlin.descriptors.DeclarationDescriptor
 import org.jetbrains.kotlin.descriptors.ModuleDescriptor
 import org.jetbrains.kotlin.descriptors.impl.ModuleDescriptorImpl
 import org.jetbrains.kotlin.incremental.components.LookupTracker
-import org.jetbrains.kotlin.ir.backend.js.lower.serialization.ir.*
+import org.jetbrains.kotlin.ir.backend.js.lower.serialization.ir.JsIrLinker
+import org.jetbrains.kotlin.ir.backend.js.lower.serialization.ir.JsIrModuleSerializer
+import org.jetbrains.kotlin.ir.backend.js.lower.serialization.ir.JsManglerDesc
+import org.jetbrains.kotlin.ir.backend.js.lower.serialization.ir.JsManglerIr
 import org.jetbrains.kotlin.ir.backend.js.lower.serialization.metadata.KlibMetadataIncrementalSerializer
 import org.jetbrains.kotlin.ir.declarations.IrModuleFragment
 import org.jetbrains.kotlin.ir.descriptors.IrBuiltIns
+import org.jetbrains.kotlin.ir.descriptors.IrFunctionFactory
 import org.jetbrains.kotlin.ir.symbols.IrSymbol
 import org.jetbrains.kotlin.ir.util.*
 import org.jetbrains.kotlin.ir.visitors.acceptVoid
@@ -50,8 +54,8 @@ import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi2ir.Psi2IrConfiguration
 import org.jetbrains.kotlin.psi2ir.Psi2IrTranslator
 import org.jetbrains.kotlin.psi2ir.generators.GeneratorContext
-import org.jetbrains.kotlin.psi2ir.generators.createGeneratorContext
 import org.jetbrains.kotlin.psi2ir.generators.GeneratorExtensions
+import org.jetbrains.kotlin.psi2ir.generators.createGeneratorContext
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.BindingContextUtils
 import org.jetbrains.kotlin.storage.LockBasedStorageManager
@@ -135,10 +139,20 @@ fun generateKLib(
         ModulesStructure(project, MainModule.SourceFiles(files), analyzer, configuration, allDependencies, friendDependencies)
 
     val psi2IrContext = runAnalysisAndPreparePsi2Ir(depsDescriptors)
+    val irBuiltIns = psi2IrContext.irBuiltIns
+    val functionFactory = IrFunctionFactory(irBuiltIns, psi2IrContext.symbolTable)
+    irBuiltIns.functionFactory = functionFactory
 
     val expectDescriptorToSymbol = mutableMapOf<DeclarationDescriptor, IrSymbol>()
 
-    val irLinker = JsIrLinker(psi2IrContext.moduleDescriptor, emptyLoggingContext, psi2IrContext.irBuiltIns, psi2IrContext.symbolTable, serializedIrFiles)
+    val irLinker = JsIrLinker(
+        psi2IrContext.moduleDescriptor,
+        emptyLoggingContext,
+        psi2IrContext.irBuiltIns,
+        psi2IrContext.symbolTable,
+        functionFactory,
+        serializedIrFiles
+    )
 
     val deserializedModuleFragments = sortDependencies(allDependencies.getFullList(), depsDescriptors.descriptors).map {
         irLinker.deserializeOnlyHeaderModule(depsDescriptors.getModuleDescriptor(it), it)
@@ -151,7 +165,7 @@ fun generateKLib(
     val moduleName = configuration[CommonConfigurationKeys.MODULE_NAME]!!
 
     if (!configuration.expectActualLinker) {
-        moduleFragment.acceptVoid(ExpectDeclarationRemover(psi2IrContext.symbolTable, doRemove = false, keepOptionalAnnotations = false))
+        moduleFragment.acceptVoid(ExpectDeclarationRemover(psi2IrContext.symbolTable, false))
     }
 
     serializeModuleIntoKlib(
@@ -200,8 +214,10 @@ fun loadIr(
             val psi2IrContext: GeneratorContext = runAnalysisAndPreparePsi2Ir(depsDescriptors)
             val irBuiltIns = psi2IrContext.irBuiltIns
             val symbolTable = psi2IrContext.symbolTable
+            val functionFactory = IrFunctionFactory(irBuiltIns, symbolTable)
+            irBuiltIns.functionFactory = functionFactory
 
-            val irLinker = JsIrLinker(psi2IrContext.moduleDescriptor, emptyLoggingContext, irBuiltIns, symbolTable, null)
+            val irLinker = JsIrLinker(psi2IrContext.moduleDescriptor, emptyLoggingContext, irBuiltIns, symbolTable, functionFactory, null)
 
             val deserializedModuleFragments = sortDependencies(allDependencies.getFullList(), depsDescriptors.descriptors).map {
                 irLinker.deserializeIrModuleHeader(depsDescriptors.getModuleDescriptor(it), it)
@@ -229,8 +245,9 @@ fun loadIr(
             )
             typeTranslator.constantValueGenerator = constantValueGenerator
             constantValueGenerator.typeTranslator = typeTranslator
-            val irBuiltIns = IrBuiltIns(moduleDescriptor.builtIns, typeTranslator, signaturer, symbolTable)
-            val irLinker = JsIrLinker(null, emptyLoggingContext, irBuiltIns, symbolTable, null)
+            val irBuiltIns = IrBuiltIns(moduleDescriptor.builtIns, typeTranslator, symbolTable)
+            val functionFactory = IrFunctionFactory(irBuiltIns, symbolTable)
+            val irLinker = JsIrLinker(null, emptyLoggingContext, irBuiltIns, symbolTable, functionFactory, null)
 
             val deserializedModuleFragments = sortDependencies(allDependencies.getFullList(), depsDescriptors.descriptors).map {
                 val strategy =
@@ -241,10 +258,11 @@ fun loadIr(
 
                 irLinker.deserializeIrModuleHeader(depsDescriptors.getModuleDescriptor(it), it, strategy)
             }
+            irBuiltIns.functionFactory = functionFactory
 
             val moduleFragment = deserializedModuleFragments.last()
 
-            irLinker.init(null, emptyList())
+            irLinker.init(null)
             ExternalDependenciesGenerator(symbolTable, listOf(irLinker), configuration.languageVersionSettings).generateUnboundSymbolsAsDependencies()
             irLinker.postProcess()
 
@@ -264,8 +282,7 @@ private fun runAnalysisAndPreparePsi2Ir(depsDescriptors: ModulesStructure): Gene
         analysisResult.bindingContext,
         depsDescriptors.compilerConfiguration.languageVersionSettings,
         SymbolTable(signaturer),
-        GeneratorExtensions(),
-        signaturer
+        GeneratorExtensions()
     )
 }
 
@@ -292,13 +309,14 @@ fun GeneratorContext.generateModuleFragmentWithPlugins(
                     symbolTable,
                     typeTranslator,
                     irBuiltIns,
+                    linker = irLinker,
                     irProviders = irProviders
                 )
             )
         }
     }
 
-    return psi2Ir.generateModuleFragment(this, files, listOf(irLinker), expectDescriptorToSymbol, extensions)
+    return psi2Ir.generateModuleFragment(this, files, listOf(irLinker), expectDescriptorToSymbol)
 }
 
 private fun createBuiltIns(storageManager: StorageManager) = object : KotlinBuiltIns(storageManager) {}

@@ -23,6 +23,8 @@ abstract class FirFile : FirPureAbstractElement(), FirAnnotationContainer, FirDe
     abstract override val annotations: List<FirAnnotationCall>
     abstract override val session: FirSession
     abstract override val resolvePhase: FirResolvePhase
+    abstract override val origin: FirDeclarationOrigin
+    abstract override val attributes: FirDeclarationAttributes
     abstract val imports: List<FirImport>
     abstract val declarations: List<FirDeclaration>
     abstract val name: String
@@ -33,4 +35,6 @@ abstract class FirFile : FirPureAbstractElement(), FirAnnotationContainer, FirDe
     abstract override fun replaceResolvePhase(newResolvePhase: FirResolvePhase)
 
     abstract override fun <D> transformAnnotations(transformer: FirTransformer<D>, data: D): FirFile
+
+    abstract fun <D> transformDeclarations(transformer: FirTransformer<D>, data: D): FirFile
 }

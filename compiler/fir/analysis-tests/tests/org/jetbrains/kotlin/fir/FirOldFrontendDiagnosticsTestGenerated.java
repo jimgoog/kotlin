@@ -7944,9 +7944,19 @@ public class FirOldFrontendDiagnosticsTestGenerated extends AbstractFirOldFronte
             runTest("compiler/testData/diagnostics/tests/funInterface/funIsNotInheritedFromBaseInterface.kt");
         }
 
+        @TestMetadata("functionDelegateClashOnJvm.kt")
+        public void testFunctionDelegateClashOnJvm() throws Exception {
+            runTest("compiler/testData/diagnostics/tests/funInterface/functionDelegateClashOnJvm.kt");
+        }
+
         @TestMetadata("genericSubstitutionForFunInterface.kt")
         public void testGenericSubstitutionForFunInterface() throws Exception {
             runTest("compiler/testData/diagnostics/tests/funInterface/genericSubstitutionForFunInterface.kt");
+        }
+
+        @TestMetadata("resolveFunInterfaceWithoutMainMethod.kt")
+        public void testResolveFunInterfaceWithoutMainMethod() throws Exception {
+            runTest("compiler/testData/diagnostics/tests/funInterface/resolveFunInterfaceWithoutMainMethod.kt");
         }
 
         @TestMetadata("severalConversionsForFunInterface.kt")
@@ -10216,11 +10226,6 @@ public class FirOldFrontendDiagnosticsTestGenerated extends AbstractFirOldFronte
             runTest("compiler/testData/diagnostics/tests/inference/possibleCycleOnConstraints.kt");
         }
 
-        @TestMetadata("recursiveTypes.kt")
-        public void testRecursiveTypes() throws Exception {
-            runTest("compiler/testData/diagnostics/tests/inference/recursiveTypes.kt");
-        }
-
         @TestMetadata("reportAboutUnresolvedReferenceAsUnresolved.kt")
         public void testReportAboutUnresolvedReferenceAsUnresolved() throws Exception {
             runTest("compiler/testData/diagnostics/tests/inference/reportAboutUnresolvedReferenceAsUnresolved.kt");
@@ -10731,6 +10736,49 @@ public class FirOldFrontendDiagnosticsTestGenerated extends AbstractFirOldFronte
             public void testWithExact() throws Exception {
                 runTest("compiler/testData/diagnostics/tests/inference/completion/withExact.kt");
             }
+
+            @TestMetadata("compiler/testData/diagnostics/tests/inference/completion/postponedArgumentsAnalysis")
+            @TestDataPath("$PROJECT_ROOT")
+            @RunWith(JUnit3RunnerWithInners.class)
+            public static class PostponedArgumentsAnalysis extends AbstractFirOldFrontendDiagnosticsTest {
+                private void runTest(String testDataFilePath) throws Exception {
+                    KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+                }
+
+                public void testAllFilesPresentInPostponedArgumentsAnalysis() throws Exception {
+                    KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/diagnostics/tests/inference/completion/postponedArgumentsAnalysis"), Pattern.compile("^(.+)\\.kt$"), Pattern.compile("^(.+)\\.fir\\.kts?$"), true);
+                }
+
+                @TestMetadata("basic.kt")
+                public void testBasic() throws Exception {
+                    runTest("compiler/testData/diagnostics/tests/inference/completion/postponedArgumentsAnalysis/basic.kt");
+                }
+
+                @TestMetadata("callableReferenceLambdaCombinationInsideCall.kt")
+                public void testCallableReferenceLambdaCombinationInsideCall() throws Exception {
+                    runTest("compiler/testData/diagnostics/tests/inference/completion/postponedArgumentsAnalysis/callableReferenceLambdaCombinationInsideCall.kt");
+                }
+
+                @TestMetadata("callableReferences.kt")
+                public void testCallableReferences() throws Exception {
+                    runTest("compiler/testData/diagnostics/tests/inference/completion/postponedArgumentsAnalysis/callableReferences.kt");
+                }
+
+                @TestMetadata("lackOfDeepIncorporation.kt")
+                public void testLackOfDeepIncorporation() throws Exception {
+                    runTest("compiler/testData/diagnostics/tests/inference/completion/postponedArgumentsAnalysis/lackOfDeepIncorporation.kt");
+                }
+
+                @TestMetadata("lambdasInTryCatch.kt")
+                public void testLambdasInTryCatch() throws Exception {
+                    runTest("compiler/testData/diagnostics/tests/inference/completion/postponedArgumentsAnalysis/lambdasInTryCatch.kt");
+                }
+
+                @TestMetadata("takingExtensibilityFromDeclarationOfAnonymousFunction.kt")
+                public void testTakingExtensibilityFromDeclarationOfAnonymousFunction() throws Exception {
+                    runTest("compiler/testData/diagnostics/tests/inference/completion/postponedArgumentsAnalysis/takingExtensibilityFromDeclarationOfAnonymousFunction.kt");
+                }
+            }
         }
 
         @TestMetadata("compiler/testData/diagnostics/tests/inference/constraints")
@@ -11216,6 +11264,79 @@ public class FirOldFrontendDiagnosticsTestGenerated extends AbstractFirOldFronte
             }
         }
 
+        @TestMetadata("compiler/testData/diagnostics/tests/inference/recursiveTypes")
+        @TestDataPath("$PROJECT_ROOT")
+        @RunWith(JUnit3RunnerWithInners.class)
+        public static class RecursiveTypes extends AbstractFirOldFrontendDiagnosticsTest {
+            private void runTest(String testDataFilePath) throws Exception {
+                KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+            }
+
+            public void testAllFilesPresentInRecursiveTypes() throws Exception {
+                KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/diagnostics/tests/inference/recursiveTypes"), Pattern.compile("^(.+)\\.kt$"), Pattern.compile("^(.+)\\.fir\\.kts?$"), true);
+            }
+
+            @TestMetadata("multirecursion.kt")
+            public void testMultirecursion() throws Exception {
+                runTest("compiler/testData/diagnostics/tests/inference/recursiveTypes/multirecursion.kt");
+            }
+
+            @TestMetadata("recursiveInIn.kt")
+            public void testRecursiveInIn() throws Exception {
+                runTest("compiler/testData/diagnostics/tests/inference/recursiveTypes/recursiveInIn.kt");
+            }
+
+            @TestMetadata("recursiveInInv.kt")
+            public void testRecursiveInInv() throws Exception {
+                runTest("compiler/testData/diagnostics/tests/inference/recursiveTypes/recursiveInInv.kt");
+            }
+
+            @TestMetadata("recursiveInOut.kt")
+            public void testRecursiveInOut() throws Exception {
+                runTest("compiler/testData/diagnostics/tests/inference/recursiveTypes/recursiveInOut.kt");
+            }
+
+            @TestMetadata("recursiveInvIn.kt")
+            public void testRecursiveInvIn() throws Exception {
+                runTest("compiler/testData/diagnostics/tests/inference/recursiveTypes/recursiveInvIn.kt");
+            }
+
+            @TestMetadata("recursiveInvOut.kt")
+            public void testRecursiveInvOut() throws Exception {
+                runTest("compiler/testData/diagnostics/tests/inference/recursiveTypes/recursiveInvOut.kt");
+            }
+
+            @TestMetadata("recursiveOutIn.kt")
+            public void testRecursiveOutIn() throws Exception {
+                runTest("compiler/testData/diagnostics/tests/inference/recursiveTypes/recursiveOutIn.kt");
+            }
+
+            @TestMetadata("recursiveOutInv.kt")
+            public void testRecursiveOutInv() throws Exception {
+                runTest("compiler/testData/diagnostics/tests/inference/recursiveTypes/recursiveOutInv.kt");
+            }
+
+            @TestMetadata("recursiveOutOut.kt")
+            public void testRecursiveOutOut() throws Exception {
+                runTest("compiler/testData/diagnostics/tests/inference/recursiveTypes/recursiveOutOut.kt");
+            }
+
+            @TestMetadata("recursiveTypeWithNonStarResult.kt")
+            public void testRecursiveTypeWithNonStarResult() throws Exception {
+                runTest("compiler/testData/diagnostics/tests/inference/recursiveTypes/recursiveTypeWithNonStarResult.kt");
+            }
+
+            @TestMetadata("recursiveTypes.kt")
+            public void testRecursiveTypes() throws Exception {
+                runTest("compiler/testData/diagnostics/tests/inference/recursiveTypes/recursiveTypes.kt");
+            }
+
+            @TestMetadata("twoTypeConstructors.kt")
+            public void testTwoTypeConstructors() throws Exception {
+                runTest("compiler/testData/diagnostics/tests/inference/recursiveTypes/twoTypeConstructors.kt");
+            }
+        }
+
         @TestMetadata("compiler/testData/diagnostics/tests/inference/regressions")
         @TestDataPath("$PROJECT_ROOT")
         @RunWith(JUnit3RunnerWithInners.class)
@@ -11511,6 +11632,11 @@ public class FirOldFrontendDiagnosticsTestGenerated extends AbstractFirOldFronte
             @TestMetadata("kt37650.kt")
             public void testKt37650() throws Exception {
                 runTest("compiler/testData/diagnostics/tests/inference/regressions/kt37650.kt");
+            }
+
+            @TestMetadata("kt38691.kt")
+            public void testKt38691() throws Exception {
+                runTest("compiler/testData/diagnostics/tests/inference/regressions/kt38691.kt");
             }
 
             @TestMetadata("kt4420.kt")
@@ -22991,6 +23117,59 @@ public class FirOldFrontendDiagnosticsTestGenerated extends AbstractFirOldFronte
             public void testOnTypeParameter() throws Exception {
                 runTest("compiler/testData/diagnostics/tests/suppress/oneWarning/onTypeParameter.kt");
             }
+        }
+    }
+
+    @TestMetadata("compiler/testData/diagnostics/tests/suspendConversion")
+    @TestDataPath("$PROJECT_ROOT")
+    @RunWith(JUnit3RunnerWithInners.class)
+    public static class SuspendConversion extends AbstractFirOldFrontendDiagnosticsTest {
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        public void testAllFilesPresentInSuspendConversion() throws Exception {
+            KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/diagnostics/tests/suspendConversion"), Pattern.compile("^(.+)\\.kt$"), Pattern.compile("^(.+)\\.fir\\.kts?$"), true);
+        }
+
+        @TestMetadata("basicSuspendConversion.kt")
+        public void testBasicSuspendConversion() throws Exception {
+            runTest("compiler/testData/diagnostics/tests/suspendConversion/basicSuspendConversion.kt");
+        }
+
+        @TestMetadata("basicSuspendConversionForCallableReference.kt")
+        public void testBasicSuspendConversionForCallableReference() throws Exception {
+            runTest("compiler/testData/diagnostics/tests/suspendConversion/basicSuspendConversionForCallableReference.kt");
+        }
+
+        @TestMetadata("basicSuspendConversionGenerics.kt")
+        public void testBasicSuspendConversionGenerics() throws Exception {
+            runTest("compiler/testData/diagnostics/tests/suspendConversion/basicSuspendConversionGenerics.kt");
+        }
+
+        @TestMetadata("chainedFunSuspendConversionForSimpleExpression.kt")
+        public void testChainedFunSuspendConversionForSimpleExpression() throws Exception {
+            runTest("compiler/testData/diagnostics/tests/suspendConversion/chainedFunSuspendConversionForSimpleExpression.kt");
+        }
+
+        @TestMetadata("severalConversionsInOneCall.kt")
+        public void testSeveralConversionsInOneCall() throws Exception {
+            runTest("compiler/testData/diagnostics/tests/suspendConversion/severalConversionsInOneCall.kt");
+        }
+
+        @TestMetadata("suspendConversionDisabled.kt")
+        public void testSuspendConversionDisabled() throws Exception {
+            runTest("compiler/testData/diagnostics/tests/suspendConversion/suspendConversionDisabled.kt");
+        }
+
+        @TestMetadata("suspendConversionWithFunInterfaces.kt")
+        public void testSuspendConversionWithFunInterfaces() throws Exception {
+            runTest("compiler/testData/diagnostics/tests/suspendConversion/suspendConversionWithFunInterfaces.kt");
+        }
+
+        @TestMetadata("suspendConversionWithReferenceAdaptation.kt")
+        public void testSuspendConversionWithReferenceAdaptation() throws Exception {
+            runTest("compiler/testData/diagnostics/tests/suspendConversion/suspendConversionWithReferenceAdaptation.kt");
         }
     }
 

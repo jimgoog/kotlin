@@ -23,6 +23,7 @@ import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference
 import org.jetbrains.kotlin.fir.references.FirSuperReference
 import org.jetbrains.kotlin.fir.references.FirThisReference
 import org.jetbrains.kotlin.fir.resolve.calls.FirNamedReferenceWithCandidate
+import org.jetbrains.kotlin.fir.resolve.calls.ImplicitDispatchReceiverValue
 import org.jetbrains.kotlin.fir.resolve.calls.isSuperReferenceExpression
 import org.jetbrains.kotlin.fir.resolve.diagnostics.ConeUnresolvedNameError
 import org.jetbrains.kotlin.fir.resolve.substitution.AbstractConeSubstitutor
@@ -52,10 +53,12 @@ inline fun <K, V, VA : V> MutableMap<K, V>.getOrPut(key: K, defaultValue: (K) ->
     }
 }
 
-val FirSession.firSymbolProvider: FirSymbolProvider by componentArrayAccessor()
-val FirSession.firProvider: FirProvider by componentArrayAccessor()
-val FirSession.correspondingSupertypesCache: FirCorrespondingSupertypesCache by componentArrayAccessor()
-val FirSession.declaredMemberScopeProvider: FirDeclaredMemberScopeProvider by componentArrayAccessor()
+val FirSession.firSymbolProvider: FirSymbolProvider by FirSession.sessionComponentAccessor()
+val FirSession.firProvider: FirProvider by FirSession.sessionComponentAccessor()
+val FirSession.correspondingSupertypesCache: FirCorrespondingSupertypesCache by FirSession.sessionComponentAccessor()
+val FirSession.declaredMemberScopeProvider: FirDeclaredMemberScopeProvider by FirSession.sessionComponentAccessor()
+val FirSession.qualifierResolver: FirQualifierResolver by FirSession.sessionComponentAccessor()
+val FirSession.typeResolver: FirTypeResolver by FirSession.sessionComponentAccessor()
 
 fun ConeClassLikeLookupTag.toSymbol(useSiteSession: FirSession): FirClassLikeSymbol<*>? {
     if (this is ConeClassLookupTagWithFixedSymbol) {
@@ -351,7 +354,14 @@ fun <T : FirResolvable> BodyResolveComponents.typeFromCallee(access: T): FirReso
             }
         }
         is FirSuperReference -> {
-            newCallee.superTypeRef as? FirResolvedTypeRef ?: buildErrorTypeRef {
+            val labelName = newCallee.labelName
+            val implicitReceiver =
+                if (labelName != null) implicitReceiverStack[labelName] as? ImplicitDispatchReceiverValue
+                else implicitReceiverStack.lastDispatchReceiver()
+            val resolvedTypeRef =
+                newCallee.superTypeRef as? FirResolvedTypeRef
+                    ?: implicitReceiver?.boundSymbol?.phasedFir?.superTypeRefs?.singleOrNull() as? FirResolvedTypeRef
+            resolvedTypeRef ?: buildErrorTypeRef {
                 source = newCallee.source
                 diagnostic = ConeUnresolvedNameError(Name.identifier("super"))
             }
@@ -373,7 +383,6 @@ private fun BodyResolveComponents.typeFromSymbol(symbol: AbstractFirBasedSymbol<
             }
         }
         is FirClassifierSymbol<*> -> {
-            val fir = (symbol as? AbstractFirBasedSymbol<*>)?.phasedFir
             // TODO: unhack
             buildResolvedTypeRef {
                 source = null

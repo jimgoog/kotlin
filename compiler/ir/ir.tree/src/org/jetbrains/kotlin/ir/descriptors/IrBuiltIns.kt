@@ -36,14 +36,13 @@ import org.jetbrains.kotlin.types.*
 class IrBuiltIns(
     val builtIns: KotlinBuiltIns,
     private val typeTranslator: TypeTranslator,
-    signaturer: IdSignatureComposer,
-    outerSymbolTable: SymbolTable? = null
+    private val symbolTable: SymbolTable
 ) {
     val languageVersionSettings = typeTranslator.languageVersionSettings
 
-    private val builtInsModule = builtIns.builtInsModule
+    lateinit var functionFactory: IrAbstractFunctionFactory
 
-    private val symbolTable = outerSymbolTable ?: SymbolTable(signaturer)
+    private val builtInsModule = builtIns.builtInsModule
 
     private val packageFragmentDescriptor = IrBuiltinsPackageFragmentDescriptorImpl(builtInsModule, KOTLIN_INTERNAL_IR_FQN)
     val packageFragment =
@@ -297,6 +296,12 @@ class IrBuiltIns(
 
     val dataClassArrayMemberToStringSymbol = defineOperator("dataClassArrayMemberToString", stringType, listOf(anyNType))
     val dataClassArrayMemberToString = dataClassArrayMemberToStringSymbol.descriptor
+
+    fun function(n: Int): IrClassSymbol = functionFactory.functionN(n).symbol
+    fun suspendFunction(n: Int): IrClassSymbol = functionFactory.suspendFunctionN(n).symbol
+
+    fun kFunction(n: Int): IrClassSymbol = functionFactory.kFunctionN(n).symbol
+    fun kSuspendFunction(n: Int): IrClassSymbol = functionFactory.kSuspendFunctionN(n).symbol
 
     companion object {
         val KOTLIN_INTERNAL_IR_FQN = FqName("kotlin.internal.ir")

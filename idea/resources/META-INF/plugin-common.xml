@@ -1,9 +1,4 @@
 <idea-plugin>
-  <application-components>
-    <component>
-      <implementation-class>org.jetbrains.kotlin.idea.versions.KotlinUpdatePluginComponent</implementation-class>
-    </component>
-  </application-components>
 
   <actions>
     <action id="Kotlin.NewFile" class="org.jetbrains.kotlin.idea.actions.NewKotlinFileAction">
@@ -16,7 +11,7 @@
       <add-to-group group-id="NewGroup" anchor="before" relative-to-action="NewFromTemplate"/>
     </action>
 
-    <group id = "ConvertJavaToKotlinGroup">
+    <group id="ConvertJavaToKotlinGroup">
       <separator/>
       <action id="ConvertJavaToKotlin" class="org.jetbrains.kotlin.idea.actions.JavaToKotlinAction">
         <keyboard-shortcut keymap="$default" first-keystroke="control alt shift K"/>
@@ -231,7 +226,7 @@
                     serviceImplementation="org.jetbrains.kotlin.idea.core.script.IdeScriptDependenciesProvider"/>
 
     <projectService serviceInterface="org.jetbrains.kotlin.idea.core.script.ScriptConfigurationManager"
-                    serviceImplementation="org.jetbrains.kotlin.idea.core.script.configuration.DefaultScriptConfigurationManager"/>
+                    serviceImplementation="org.jetbrains.kotlin.idea.core.script.configuration.CompositeScriptConfigurationManager"/>
 
     <projectService serviceInterface="org.jetbrains.kotlin.scripting.resolve.ScriptReportSink"
                     serviceImplementation="org.jetbrains.kotlin.idea.core.script.IdeScriptReportSink"/>
@@ -326,11 +321,6 @@
     <searchEverywhereClassifier implementation="org.jetbrains.kotlin.idea.goto.KotlinSearchEverywhereClassifier"/>
     <lang.importOptimizer language="kotlin" implementationClass="org.jetbrains.kotlin.idea.imports.KotlinImportOptimizer"/>
     <lang.namesValidator language="kotlin" implementationClass="org.jetbrains.kotlin.idea.refactoring.KotlinNamesValidator"/>
-
-    <fileTypeFactory implementation="org.jetbrains.kotlin.idea.core.KotlinFileTypeFactory"/>
-    <fileTypeFactory implementation="org.jetbrains.kotlin.idea.KotlinJavaScriptMetaFileTypeFactory"/>
-    <fileTypeFactory implementation="org.jetbrains.kotlin.idea.KotlinBuiltInFileTypeFactory"/>
-    <fileTypeFactory implementation="org.jetbrains.kotlin.idea.KotlinModuleFileFactory"/>
 
     <compileServer.plugin classpath="jps/kotlin-jps-plugin.jar;kotlin-stdlib.jar;kotlin-reflect.jar;kotlin-plugin.jar"/>
     <compiler.task execute="BEFORE" implementation="org.jetbrains.kotlin.idea.internal.makeBackup.MakeBackupCompileTask"/>
@@ -527,7 +517,7 @@
     <liveTemplateContext implementation="org.jetbrains.kotlin.idea.liveTemplates.KotlinTemplateContextType$Expression"/>
     <liveTemplateContext implementation="org.jetbrains.kotlin.idea.liveTemplates.KotlinTemplateContextType$Comment"/>
     <liveTemplateContext implementation="org.jetbrains.kotlin.idea.liveTemplates.KotlinTemplateContextType$ObjectDeclaration"/>
-    <defaultLiveTemplatesProvider implementation="org.jetbrains.kotlin.idea.liveTemplates.KotlinLiveTemplatesProvider"/>
+
     <liveTemplateMacro implementation="org.jetbrains.kotlin.idea.liveTemplates.macro.AnyVariableMacro"/>
     <liveTemplateMacro implementation="org.jetbrains.kotlin.idea.liveTemplates.macro.SuitableVariableMacro"/>
     <liveTemplateMacro implementation="org.jetbrains.kotlin.idea.liveTemplates.macro.FunctionParametersMacro"/>
@@ -704,6 +694,9 @@
     <gotoDeclarationHandler implementation="org.jetbrains.kotlin.idea.search.ideaExtensions.KotlinImportAliasGotoDeclarationHandler"/>
     <referencesSearch implementation="org.jetbrains.kotlin.idea.search.ideaExtensions.KotlinReferencesSearcher"/>
     <referencesSearch implementation="org.jetbrains.kotlin.idea.search.ideaExtensions.KotlinAliasedImportedElementSearcher"/>
+<!--
+    <codeUsageScopeOptimizer implementation="org.jetbrains.kotlin.idea.search.ideaExtensions.KotlinReferenceScopeOptimizer"/>
+-->
     <directClassInheritorsSearch implementation="org.jetbrains.kotlin.idea.search.ideaExtensions.KotlinDirectInheritorsSearcher"/>
     <overridingMethodsSearch implementation="org.jetbrains.kotlin.idea.search.ideaExtensions.KotlinOverridingMethodsWithGenericsSearcher"/>
     <definitionsScopedSearch implementation="org.jetbrains.kotlin.idea.search.ideaExtensions.KotlinDefinitionsSearcher"/>

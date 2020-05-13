@@ -8,6 +8,8 @@ package org.jetbrains.kotlin.fir.declarations.impl
 import org.jetbrains.kotlin.fir.FirImplementationDetail
 import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.FirSourceElement
+import org.jetbrains.kotlin.fir.declarations.FirDeclarationAttributes
+import org.jetbrains.kotlin.fir.declarations.FirDeclarationOrigin
 import org.jetbrains.kotlin.fir.declarations.FirPropertyAccessor
 import org.jetbrains.kotlin.fir.declarations.FirResolvePhase
 import org.jetbrains.kotlin.fir.declarations.FirValueParameter
@@ -28,6 +30,7 @@ open class FirValueParameterImpl @FirImplementationDetail constructor(
     override val source: FirSourceElement?,
     override val session: FirSession,
     override var resolvePhase: FirResolvePhase,
+    override val origin: FirDeclarationOrigin,
     override var returnTypeRef: FirTypeRef,
     override val name: Name,
     override val symbol: FirVariableSymbol<FirValueParameter>,
@@ -37,6 +40,7 @@ open class FirValueParameterImpl @FirImplementationDetail constructor(
     override val isNoinline: Boolean,
     override val isVararg: Boolean,
 ) : FirValueParameter() {
+    override val attributes: FirDeclarationAttributes = FirDeclarationAttributes()
     override val receiverTypeRef: FirTypeRef? get() = null
     override val initializer: FirExpression? get() = null
     override val delegate: FirExpression? get() = null

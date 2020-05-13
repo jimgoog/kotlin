@@ -9,6 +9,8 @@ import com.intellij.openapi.externalSystem.model.DataNode
 import com.intellij.openapi.externalSystem.model.project.ProjectData
 import org.gradle.tooling.model.idea.IdeaProject
 import org.gradle.tooling.model.kotlin.dsl.KotlinDslScriptsModel
+import org.jetbrains.kotlin.gradle.KotlinDslScriptAdditionalTask
+import org.jetbrains.kotlin.gradle.KotlinDslScriptModelProvider
 import org.jetbrains.kotlin.idea.scripting.gradle.kotlinDslScriptsModelImportSupported
 import org.jetbrains.plugins.gradle.model.Build
 import org.jetbrains.plugins.gradle.model.ClassSetImportModelProvider
@@ -45,7 +47,7 @@ class KotlinDslScriptModelResolver : KotlinDslScriptModelResolverCommon() {
         root.projects.forEach {
             if (it.projectIdentifier.projectPath == ":") {
                 resolverCtx.models.getModel(it, KotlinDslScriptsModel::class.java)?.let { model ->
-                    processScriptModel(ideProject, model, it.projectIdentifier.projectPath)
+                    processScriptModel(resolverCtx, model, it.projectIdentifier.projectPath)
                 }
             }
         }

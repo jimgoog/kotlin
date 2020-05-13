@@ -69,8 +69,12 @@ class ModulesToIRsConverter(
     fun Writer.createBuildFiles(): TaskResult<List<BuildFileIR>> = with(data) {
         val needExplicitRootBuildFile = !needFlattening
         val initialState = ModulesToIrsState(projectPath, parentModuleHasTransitivelySpecifiedKotlinVersion = false)
+
+        val parentModuleHasKotlinVersion = allModules.any { module ->
+            module.configurator == AndroidSinglePlatformModuleConfigurator
+        }
+
         rootModules.mapSequence { module ->
-            val parentModuleHasKotlinVersion = module.configurator == AndroidSinglePlatformModuleConfigurator
             createBuildFileForModule(
                 module,
                 initialState.copy(parentModuleHasTransitivelySpecifiedKotlinVersion = parentModuleHasKotlinVersion)
@@ -120,7 +124,14 @@ class ModulesToIRsConverter(
 
             with(dependencyType) {
                 @Suppress("DEPRECATION")
-                with(unsafeSettingWriter) { runArbitraryTask(module, to, data).ensure() }
+                with(unsafeSettingWriter) {
+                    runArbitraryTask(
+                        module,
+                        to,
+                        to.path.considerSingleRootModuleMode(data.isSingleRootModuleMode).asPath(),
+                        data
+                    ).ensure()
+                }
                 irsToAddToModules.getOrPut(to) { mutableListOf() } += createToIRs(module, to, data).get()
                 createDependencyIrs(module, to, data)
             }
@@ -174,11 +185,11 @@ class ModulesToIRsConverter(
         }
 
         module.subModules.mapSequence { subModule ->
-                createBuildFileForModule(
-                    subModule,
-                    state.stateForSubModule(modulePath)
-                )
-            }.map { it.flatten() }
+            createBuildFileForModule(
+                subModule,
+                state.stateForSubModule(modulePath)
+            )
+        }.map { it.flatten() }
             .map { children ->
                 buildFileIR?.let { children + it } ?: children
             }
@@ -280,7 +291,6 @@ class ModulesToIRsConverter(
                 // do not print version for non-root modules for gradle
                 val needRemoveVersion = data.buildSystemType.isGradle
                         && state.parentModuleHasTransitivelySpecifiedKotlinVersion
-                        && module.configurator != AndroidSinglePlatformModuleConfigurator
                 when {
                     needRemoveVersion -> plugin.copy(version = null)
                     else -> plugin

@@ -30,16 +30,16 @@ interface ScriptConfigurationCache {
 
     fun setApplied(file: VirtualFile, configurationSnapshot: ScriptConfigurationSnapshot)
     fun setLoaded(file: VirtualFile, configurationSnapshot: ScriptConfigurationSnapshot)
-    fun markOutOfDate(scope: ScriptConfigurationCacheScope)
 
     fun allApplied(): Map<VirtualFile, ScriptCompilationConfigurationWrapper>
     fun clear()
+
+    fun getAnyLoadedScript(): ScriptCompilationConfigurationWrapper?
 }
 
 sealed class ScriptConfigurationCacheScope {
     object All : ScriptConfigurationCacheScope()
     class File(val file: KtFile) : ScriptConfigurationCacheScope()
-    class Except(val file: KtFile) : ScriptConfigurationCacheScope()
 }
 
 data class ScriptConfigurationState(

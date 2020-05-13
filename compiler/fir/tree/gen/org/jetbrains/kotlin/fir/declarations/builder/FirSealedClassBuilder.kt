@@ -12,6 +12,8 @@ import org.jetbrains.kotlin.fir.FirSourceElement
 import org.jetbrains.kotlin.fir.builder.FirAnnotationContainerBuilder
 import org.jetbrains.kotlin.fir.builder.FirBuilderDsl
 import org.jetbrains.kotlin.fir.declarations.FirDeclaration
+import org.jetbrains.kotlin.fir.declarations.FirDeclarationAttributes
+import org.jetbrains.kotlin.fir.declarations.FirDeclarationOrigin
 import org.jetbrains.kotlin.fir.declarations.FirDeclarationStatus
 import org.jetbrains.kotlin.fir.declarations.FirRegularClass
 import org.jetbrains.kotlin.fir.declarations.FirResolvePhase
@@ -39,6 +41,7 @@ class FirSealedClassBuilder : AbstractFirRegularClassBuilder, FirAnnotationConta
     override var source: FirSourceElement? = null
     override lateinit var session: FirSession
     override var resolvePhase: FirResolvePhase = FirResolvePhase.RAW_FIR
+    override lateinit var origin: FirDeclarationOrigin
     override val annotations: MutableList<FirAnnotationCall> = mutableListOf()
     override val typeParameters: MutableList<FirTypeParameterRef> = mutableListOf()
     override lateinit var status: FirDeclarationStatus
@@ -56,6 +59,7 @@ class FirSealedClassBuilder : AbstractFirRegularClassBuilder, FirAnnotationConta
             source,
             session,
             resolvePhase,
+            origin,
             annotations,
             typeParameters,
             status,

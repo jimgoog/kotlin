@@ -12,6 +12,7 @@ import org.gradle.api.Project
 import org.gradle.api.artifacts.*
 import org.gradle.api.file.FileCollection
 import org.gradle.api.file.FileTree
+import org.gradle.api.logging.Logger
 import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.*
 import org.gradle.api.tasks.compile.AbstractCompile
@@ -20,11 +21,15 @@ import org.jetbrains.kotlin.gradle.dsl.KotlinCommonOptions
 import org.jetbrains.kotlin.gradle.dsl.KotlinCommonToolOptions
 import org.jetbrains.kotlin.gradle.dsl.KotlinCompile
 import org.jetbrains.kotlin.gradle.dsl.NativeCacheKind
+import org.jetbrains.kotlin.gradle.internal.ensureParentDirsCreated
 import org.jetbrains.kotlin.gradle.plugin.LanguageSettingsBuilder
 import org.jetbrains.kotlin.gradle.plugin.cocoapods.asValidFrameworkName
 import org.jetbrains.kotlin.gradle.plugin.mpp.*
 import org.jetbrains.kotlin.gradle.plugin.sources.DefaultLanguageSettingsBuilder
+import org.jetbrains.kotlin.gradle.utils.getValue
+import org.jetbrains.kotlin.gradle.utils.klibModuleName
 import org.jetbrains.kotlin.konan.library.KLIB_INTEROP_IR_PROVIDER_IDENTIFIER
+import org.jetbrains.kotlin.konan.properties.saveToFile
 import org.jetbrains.kotlin.konan.target.CompilerOutputKind
 import org.jetbrains.kotlin.konan.target.CompilerOutputKind.*
 import org.jetbrains.kotlin.konan.target.KonanTarget
@@ -32,6 +37,8 @@ import org.jetbrains.kotlin.library.*
 import java.io.File
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
+import org.jetbrains.kotlin.konan.file.File as KFile
+import org.jetbrains.kotlin.util.Logger as KLogger
 
 // TODO: It's just temporary tasks used while KN isn't integrated with Big Kotlin compilation infrastructure.
 // region Useful extensions
@@ -240,6 +247,22 @@ abstract class AbstractKotlinNativeCompile<T : KotlinCommonToolOptions> : Abstra
         }
     }
 
+    @get:Input
+    @get:Optional
+    internal val konanTargetsForManifest: String by project.provider {
+        (compilation as? KotlinSharedNativeCompilation)
+            ?.konanTargets
+            ?.joinToString(separator = " ") { it.visibleName }
+            .orEmpty()
+    }
+
+    @get:Internal
+    internal val manifestFile: Provider<File>
+        get() = project.provider {
+            val inputManifestFile = project.buildDir.resolve("tmp/$name/inputManifest")
+            inputManifestFile
+        }
+
     // Args passed to the compiler only (except sources).
     protected open fun buildCompilerArgs(): List<String> = mutableListOf<String>().apply {
         addKey("-opt", optimized)
@@ -252,6 +275,7 @@ abstract class AbstractKotlinNativeCompile<T : KotlinCommonToolOptions> : Abstra
         if (compilation is KotlinSharedNativeCompilation) {
             add("-Xexpect-actual-linker")
             add("-Xmetadata-klib")
+            addArg("-manifest", manifestFile.get().absolutePath)
         }
 
         addArg("-o", outputFile.get().absolutePath)
@@ -273,6 +297,15 @@ abstract class AbstractKotlinNativeCompile<T : KotlinCommonToolOptions> : Abstra
     open fun compile() {
         val output = outputFile.get()
         output.parentFile.mkdirs()
+
+        if (compilation is KotlinSharedNativeCompilation) {
+            val manifestFile: File = manifestFile.get()
+            manifestFile.ensureParentDirsCreated()
+            val properties = java.util.Properties()
+            properties[KLIB_PROPERTY_NATIVE_TARGETS] = konanTargetsForManifest
+            properties.saveToFile(org.jetbrains.kotlin.konan.file.File(manifestFile.toPath()))
+        }
+
         KotlinNativeCompilerRunner(project).run(buildArgs())
     }
 }
@@ -296,6 +329,14 @@ open class KotlinNativeCompile : AbstractKotlinNativeCompile<KotlinCommonOptions
     @get:Internal
     override val baseName: String
         get() = if (compilation.isMainCompilation) project.name else "${project.name}_${compilation.name}"
+
+    @get:Input
+    val moduleName: String by project.provider {
+        project.klibModuleName(baseName)
+    }
+
+    @get:Input
+    val shortModuleName: String by project.provider { baseName }
 
     // Inputs and outputs.
     // region Sources.
@@ -378,6 +419,9 @@ open class KotlinNativeCompile : AbstractKotlinNativeCompile<KotlinCommonOptions
     override fun buildCompilerArgs(): List<String> = mutableListOf<String>().apply {
         addAll(super.buildCompilerArgs())
 
+        // Configure FQ module name to avoid cyclic dependencies in klib manifests (see KT-36721).
+        addArg("-module-name", moduleName)
+        add("-Xshort-module-name=$shortModuleName")
         val friends = friendModule?.files
         if (friends != null && friends.isNotEmpty()) {
             addArg("-friend-modules", friends.map { it.absolutePath }.joinToString(File.pathSeparator))
@@ -737,7 +781,9 @@ internal class CacheBuilder(val project: Project, val binary: NativeBinary) {
         val artifactsLibraries = artifactsToAddToCache
             .map {
                 resolveSingleFileKlib(
-                    org.jetbrains.kotlin.konan.file.File(it.file.absolutePath), strategy = nativeSingleFileResolveStrategy
+                    KFile(it.file.absolutePath),
+                    logger = GradleLoggerAdapter(project.logger),
+                    strategy = nativeSingleFileResolveStrategy
                 )
             }
             .associateBy { it.uniqueName }
@@ -807,7 +853,9 @@ internal class CacheBuilder(val project: Project, val binary: NativeBinary) {
         if (File(rootCacheDirectory, platformLibName.cachedName).exists())
             return
         val unresolvedDependencies = resolveSingleFileKlib(
-            org.jetbrains.kotlin.konan.file.File(platformLib.absolutePath), strategy = nativeSingleFileResolveStrategy
+            KFile(platformLib.absolutePath),
+            logger = GradleLoggerAdapter(project.logger),
+            strategy = nativeSingleFileResolveStrategy
         ).unresolvedDependencies
         for (dependency in unresolvedDependencies)
             ensureCompilerProvidedLibPrecached(dependency.path, platformLibs, visitedLibs)
@@ -852,6 +900,13 @@ internal class CacheBuilder(val project: Project, val binary: NativeBinary) {
         }
     }
 
+    private class GradleLoggerAdapter(private val gradleLogger: Logger) : KLogger {
+        override fun log(message: String) = gradleLogger.info(message)
+        override fun warning(message: String) = gradleLogger.warn(message)
+        override fun error(message: String) = kotlin.error(message)
+        override fun fatal(message: String): Nothing = kotlin.error(message)
+    }
+
     companion object {
         internal fun getRootCacheDirectory(konanHome: File, target: KonanTarget, debuggable: Boolean, cacheKind: NativeCacheKind): File {
             require(cacheKind != NativeCacheKind.NONE) { "Usupported cache kind: ${NativeCacheKind.NONE}" }
@@ -885,14 +940,21 @@ open class CInteropProcess : DefaultTask() {
     val interopName: String
         @Internal get() = settings.name
 
-    val outputFileName: String
-        @Internal get() = with(CompilerOutputKind.LIBRARY) {
-            val baseName = settings.compilation.let {
+    val baseKlibName: String
+        @Internal get() {
+            val compilationPrefix = settings.compilation.let {
                 if (it.isMainCompilation) project.name else it.name
             }
-            val suffix = suffix(konanTarget)
-            return "$baseName-cinterop-$interopName$suffix"
+            return "$compilationPrefix-cinterop-$interopName"
         }
+
+    val outputFileName: String
+        @Internal get() = with(CompilerOutputKind.LIBRARY) {
+            "$baseKlibName${suffix(konanTarget)}"
+        }
+
+    val moduleName: String
+        @Input get() = project.klibModuleName(baseKlibName)
 
     @get:Internal
     val outputFile: File
@@ -960,6 +1022,10 @@ open class CInteropProcess : DefaultTask() {
 
             addArgs("-compiler-option", allHeadersDirs.map { "-I${it.absolutePath}" })
             addArgs("-headerFilterAdditionalSearchPrefix", headerFilterDirs.map { it.absolutePath })
+
+            if (project.konanVersion.isAtLeast(1, 4, 0)) {
+                addArg("-Xmodule-name", moduleName)
+            }
 
             addAll(extraOpts)
         }

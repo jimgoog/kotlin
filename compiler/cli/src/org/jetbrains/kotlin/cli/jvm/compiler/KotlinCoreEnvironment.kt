@@ -34,9 +34,6 @@ import com.intellij.openapi.extensions.ExtensionsArea
 import com.intellij.openapi.fileTypes.PlainTextFileType
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
-import com.intellij.openapi.util.JDOMUtil
-import com.intellij.openapi.util.NotNullLazyValue
-import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.util.io.FileUtilRt
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.vfs.*
@@ -107,10 +104,7 @@ import org.jetbrains.kotlin.resolve.lazy.declarations.CliDeclarationProviderFact
 import org.jetbrains.kotlin.resolve.lazy.declarations.DeclarationProviderFactoryService
 import org.jetbrains.kotlin.utils.PathUtil
 import java.io.File
-import java.lang.reflect.Field
-import java.lang.reflect.Modifier
 import java.util.zip.ZipFile
-import javax.xml.stream.XMLInputFactory
 
 class KotlinCoreEnvironment private constructor(
     val projectEnvironment: JavaCoreProjectEnvironment,
@@ -556,6 +550,8 @@ class KotlinCoreEnvironment private constructor(
             CollectAdditionalSourcesExtension.registerExtensionPoint(project)
             ExtraImportsProviderExtension.registerExtensionPoint(project)
             IrGenerationExtension.registerExtensionPoint(project)
+            @Suppress("DEPRECATION_ERROR")
+            org.jetbrains.kotlin.backend.common.extensions.PureIrGenerationExtension.registerExtensionPoint(project)
             ScriptEvaluationExtension.registerExtensionPoint(project)
             ShellExtension.registerExtensionPoint(project)
             TypeResolutionInterceptor.registerExtensionPoint(project)

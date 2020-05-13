@@ -1,4 +1,10 @@
 <idea-plugin>
+  <extensionPoints>
+    <extensionPoint qualifiedName="org.jetbrains.kotlin.scripting.idea.scriptingSupportProvider"
+                    interface="org.jetbrains.kotlin.idea.core.script.configuration.ScriptingSupport$Provider"
+                    area="IDEA_PROJECT"/>
+  </extensionPoints>
+
   <extensions defaultExtensionNs="com.intellij">
     <projectService serviceImplementation="org.jetbrains.kotlin.idea.core.script.configuration.utils.ScriptClassRootsStorage"/>
 

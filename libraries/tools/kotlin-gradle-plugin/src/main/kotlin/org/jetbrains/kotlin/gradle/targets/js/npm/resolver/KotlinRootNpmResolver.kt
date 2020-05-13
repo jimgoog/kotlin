@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2020 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -18,6 +18,7 @@ import org.jetbrains.kotlin.gradle.targets.js.npm.KotlinNpmResolutionManager
 import org.jetbrains.kotlin.gradle.targets.js.npm.PackageJsonUpToDateCheck
 import org.jetbrains.kotlin.gradle.targets.js.npm.plugins.RootResolverPlugin
 import org.jetbrains.kotlin.gradle.targets.js.npm.resolved.KotlinCompilationNpmResolution
+import org.jetbrains.kotlin.gradle.targets.js.npm.resolved.KotlinProjectNpmResolution
 import org.jetbrains.kotlin.gradle.targets.js.npm.resolved.KotlinRootNpmResolution
 import org.jetbrains.kotlin.gradle.tasks.registerTask
 
@@ -37,18 +38,25 @@ internal class KotlinRootNpmResolver internal constructor(
         }
     }
 
-    private var closed: Boolean = false
+    enum class State {
+        CONFIGURING,
+        PROJECTS_CLOSED,
+        INSTALLED
+    }
+
+    @Volatile
+    private var state: State = State.CONFIGURING
 
     val gradleNodeModules = GradleNodeModulesCache(nodeJs)
     val compositeNodeModules = CompositeNodeModulesCache(nodeJs)
     val packageJsonUmbrella = rootProject.registerTask(PACKAGE_JSON_UMBRELLA_TASK_NAME, Task::class.java) {}
-    private val projectResolvers = mutableMapOf<Project, KotlinProjectNpmResolver>()
+    val projectResolvers = mutableMapOf<Project, KotlinProjectNpmResolver>()
 
     fun alreadyResolvedMessage(action: String) = "Cannot $action. NodeJS projects already resolved."
 
     @Synchronized
     fun addProject(target: Project) {
-        check(!closed) { alreadyResolvedMessage("add new project: $target") }
+        check(state == State.CONFIGURING) { alreadyResolvedMessage("add new project: $target") }
         projectResolvers[target] = KotlinProjectNpmResolver(target, this)
     }
 
@@ -86,45 +94,77 @@ internal class KotlinRootNpmResolver internal constructor(
     }
 
     /**
-     * Don't use directly, use [NodeJsRootExtension.resolveIfNeeded] instead.
+     * Don't use directly, use [KotlinNpmResolutionManager.installIfNeeded] instead.
      */
-    internal fun close(forceUpToDate: Boolean): KotlinRootNpmResolution {
-        check(!closed)
-        closed = true
+    internal fun prepareInstallation(): Installation {
+        synchronized(this@KotlinRootNpmResolver) {
+            check(state == State.CONFIGURING) {
+                "Projects must be configuring"
+            }
+            state = State.PROJECTS_CLOSED
 
-        val projectResolutions = projectResolvers.values
-            .map { it.close() }
-            .associateBy { it.project }
-        val allNpmPackages = projectResolutions.values.flatMap { it.npmProjects }
+            val projectResolutions = projectResolvers.values
+                .map { it.close() }
+                .associateBy { it.project }
+            val allNpmPackages = projectResolutions.values.flatMap { it.npmProjects }
 
-        gradleNodeModules.close()
+            gradleNodeModules.close()
 
-        // we need manual up-to-date checking to avoid call package manager during
-        // idea import if nothing was changed
-        // we should call it even kotlinNpmInstall task is up-to-date (skipPackageManager is true)
-        // because our upToDateChecks saves state for next execution
-        val upToDateChecks = allNpmPackages.map {
-            PackageJsonUpToDateCheck(it.npmProject)
+            nodeJs.packageManager.prepareRootProject(
+                rootProject,
+                allNpmPackages
+            )
+
+            return Installation(
+                projectResolutions
+            )
         }
-        val upToDate = forceUpToDate || upToDateChecks.all { it.upToDate }
-
-        nodeJs.packageManager.resolveRootProject(
-            rootProject,
-            allNpmPackages,
-            upToDate,
-            nodeJs.npmInstallTask.args
-        )
-
-        nodeJs.rootNodeModulesStateFile.writeText(System.currentTimeMillis().toString())
-
-        upToDateChecks.forEach { it.commit() }
-
-        return KotlinRootNpmResolution(rootProject, projectResolutions)
     }
 
-    internal fun closePlugins(resolution: KotlinRootNpmResolution) {
-        plugins.forEach {
-            it.close(resolution)
+    open inner class Installation(val projectResolutions: Map<Project, KotlinProjectNpmResolution>) {
+        operator fun get(project: Project) =
+            projectResolutions[project] ?: KotlinProjectNpmResolution.empty(project)
+
+        internal fun install(
+            forceUpToDate: Boolean,
+            args: List<String>
+        ): KotlinRootNpmResolution {
+            synchronized(this@KotlinRootNpmResolver) {
+                check(state == State.PROJECTS_CLOSED) {
+                    "Projects must be closed"
+                }
+                state = State.INSTALLED
+
+                val allNpmPackages = projectResolutions
+                    .values
+                    .flatMap { it.npmProjects }
+
+                // we need manual up-to-date checking to avoid call package manager during
+                // idea import if nothing was changed
+                // we should call it even kotlinNpmInstall task is up-to-date (skipPackageManager is true)
+                // because our upToDateChecks saves state for next execution
+                val upToDateChecks = allNpmPackages.map {
+                    PackageJsonUpToDateCheck(it.npmProject)
+                }
+                val upToDate = forceUpToDate || upToDateChecks.all { it.upToDate }
+
+                nodeJs.packageManager.resolveRootProject(
+                    nodeJs.rootProject,
+                    allNpmPackages,
+                    upToDate,
+                    args
+                )
+
+                upToDateChecks.forEach { it.commit() }
+
+                return KotlinRootNpmResolution(rootProject, projectResolutions)
+            }
+        }
+
+        internal fun closePlugins(resolution: KotlinRootNpmResolution) {
+            plugins.forEach {
+                it.close(resolution)
+            }
         }
     }
 

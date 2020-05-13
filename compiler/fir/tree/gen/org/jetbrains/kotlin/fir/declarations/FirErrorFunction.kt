@@ -26,6 +26,8 @@ abstract class FirErrorFunction : FirPureAbstractElement(), FirFunction<FirError
     abstract override val source: FirSourceElement?
     abstract override val session: FirSession
     abstract override val resolvePhase: FirResolvePhase
+    abstract override val origin: FirDeclarationOrigin
+    abstract override val attributes: FirDeclarationAttributes
     abstract override val annotations: List<FirAnnotationCall>
     abstract override val returnTypeRef: FirTypeRef
     abstract override val receiverTypeRef: FirTypeRef?

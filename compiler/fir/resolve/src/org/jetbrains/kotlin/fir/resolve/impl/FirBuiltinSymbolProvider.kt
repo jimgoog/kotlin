@@ -157,6 +157,7 @@ class FirBuiltinSymbolProvider(val session: FirSession, val kotlinScopeProvider:
                 FirRegularClassSymbol(this).apply symbol@{
                     buildClassImpl klass@{
                         session = this@FirBuiltinSymbolProvider.session
+                        origin = FirDeclarationOrigin.Synthetic
                         name = relativeClassName.shortName()
                         status = FirDeclarationStatusImpl(Visibilities.PUBLIC, Modality.ABSTRACT).apply {
                             isExpect = false
@@ -174,6 +175,7 @@ class FirBuiltinSymbolProvider(val session: FirSession, val kotlinScopeProvider:
                             (1..arity).map {
                                 buildTypeParameter {
                                     session = this@FirBuiltinSymbolProvider.session
+                                    origin = FirDeclarationOrigin.Synthetic
                                     name = Name.identifier("P$it")
                                     symbol = FirTypeParameterSymbol()
                                     variance = Variance.IN_VARIANCE
@@ -185,6 +187,7 @@ class FirBuiltinSymbolProvider(val session: FirSession, val kotlinScopeProvider:
                         typeParameters.add(
                             buildTypeParameter {
                                 session = this@FirBuiltinSymbolProvider.session
+                                origin = FirDeclarationOrigin.Synthetic
                                 name = Name.identifier("R")
                                 symbol = FirTypeParameterSymbol()
                                 variance = Variance.OUT_VARIANCE
@@ -235,7 +238,10 @@ class FirBuiltinSymbolProvider(val session: FirSession, val kotlinScopeProvider:
                             )
 
                             FunctionClassDescriptor.Kind.SuspendFunction -> listOf(
-                                session.builtinTypes.anyType
+                                buildResolvedTypeRef {
+                                    type = ConeClassLikeLookupTagImpl(StandardClassIds.Function)
+                                        .constructClassType(arrayOf(typeArguments.last().type), isNullable = false)
+                                }
                             )
 
                             FunctionClassDescriptor.Kind.KFunction -> listOf(
@@ -247,12 +253,17 @@ class FirBuiltinSymbolProvider(val session: FirSession, val kotlinScopeProvider:
                             )
 
                             FunctionClassDescriptor.Kind.KSuspendFunction -> listOf(
+                                buildResolvedTypeRef {
+                                    type = ConeClassLikeLookupTagImpl(StandardClassIds.KFunction)
+                                        .constructClassType(arrayOf(typeArguments.last().type), isNullable = false)
+                                },
                                 createSuperType(FunctionClassDescriptor.Kind.SuspendFunction)
                             )
                         }
                         addDeclaration(
                             buildSimpleFunction {
                                 session = this@FirBuiltinSymbolProvider.session
+                                origin = FirDeclarationOrigin.Synthetic
                                 returnTypeRef = typeArguments.last()
                                 this.name = name
                                 status = functionStatus
@@ -266,6 +277,8 @@ class FirBuiltinSymbolProvider(val session: FirSession, val kotlinScopeProvider:
                                     val parameterName = Name.identifier("p${index + 1}")
                                     buildValueParameter {
                                         session = this@FirBuiltinSymbolProvider.session
+                                        origin = FirDeclarationOrigin.Synthetic
+                                        resolvePhase = FirResolvePhase.ANALYZED_DEPENDENCIES
                                         returnTypeRef = typeArgument
                                         this.name = parameterName
                                         symbol = FirVariableSymbol(parameterName)

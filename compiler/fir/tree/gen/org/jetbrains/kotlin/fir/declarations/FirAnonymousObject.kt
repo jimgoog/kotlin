@@ -25,6 +25,8 @@ abstract class FirAnonymousObject : FirClass<FirAnonymousObject>, FirExpression(
     abstract override val source: FirSourceElement?
     abstract override val session: FirSession
     abstract override val resolvePhase: FirResolvePhase
+    abstract override val origin: FirDeclarationOrigin
+    abstract override val attributes: FirDeclarationAttributes
     abstract override val typeParameters: List<FirTypeParameterRef>
     abstract override val classKind: ClassKind
     abstract override val superTypeRefs: List<FirTypeRef>
@@ -42,6 +44,8 @@ abstract class FirAnonymousObject : FirClass<FirAnonymousObject>, FirExpression(
     abstract override fun replaceSuperTypeRefs(newSuperTypeRefs: List<FirTypeRef>)
 
     abstract override fun replaceTypeRef(newTypeRef: FirTypeRef)
+
+    abstract override fun <D> transformSuperTypeRefs(transformer: FirTransformer<D>, data: D): FirAnonymousObject
 
     abstract override fun <D> transformDeclarations(transformer: FirTransformer<D>, data: D): FirAnonymousObject
 

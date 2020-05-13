@@ -96,17 +96,6 @@ class Fir2IrConversionScope {
         return irClass.thisReceiver
     }
 
-    fun lastDispatchReceiverParameter(): IrValueParameter? {
-        // Use the dispatch receiver of the containing/enclosing functions (from the last to the first)
-        for (function in functionStack.asReversed()) {
-            function.dispatchReceiverParameter?.let { return it }
-        }
-
-        // Use the dispatch receiver of the containing class
-        val lastClass = classStack.lastOrNull()
-        return lastClass?.thisReceiver
-    }
-
     fun lastClass(): IrClass? = classStack.lastOrNull()
 
     fun lastSubject(): IrVariable = subjectVariableStack.last()

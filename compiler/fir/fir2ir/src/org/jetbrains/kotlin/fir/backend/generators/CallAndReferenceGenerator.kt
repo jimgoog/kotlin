@@ -30,10 +30,7 @@ import org.jetbrains.kotlin.ir.expressions.IrExpression
 import org.jetbrains.kotlin.ir.expressions.IrStatementOrigin
 import org.jetbrains.kotlin.ir.expressions.impl.*
 import org.jetbrains.kotlin.ir.symbols.*
-import org.jetbrains.kotlin.ir.types.IrType
-import org.jetbrains.kotlin.ir.types.classifierOrNull
-import org.jetbrains.kotlin.ir.types.makeNotNull
-import org.jetbrains.kotlin.ir.types.makeNullable
+import org.jetbrains.kotlin.ir.types.*
 import org.jetbrains.kotlin.psi.KtPropertyDelegate
 import org.jetbrains.kotlin.psi2ir.generators.hasNoSideEffects
 
@@ -164,26 +161,44 @@ internal class CallAndReferenceGenerator(
             declarationStorage,
             conversionScope
         )
-        return typeRef.convertWithOffsets { startOffset, endOffset ->
+        return qualifiedAccess.convertWithOffsets { startOffset, endOffset ->
+            val dispatchReceiver = qualifiedAccess.dispatchReceiver
             if (qualifiedAccess.calleeReference is FirSuperReference) {
-                if (typeRef !is FirComposedSuperTypeRef) {
-                    val dispatchReceiver = conversionScope.lastDispatchReceiverParameter()
-                    if (dispatchReceiver != null) {
-                        return@convertWithOffsets IrGetValueImpl(startOffset, endOffset, dispatchReceiver.type, dispatchReceiver.symbol)
+                if (typeRef !is FirComposedSuperTypeRef && dispatchReceiver !is FirNoReceiverExpression) {
+                    return@convertWithOffsets visitor.convertToIrExpression(dispatchReceiver)
+                }
+            }
+            var superQualifierSymbol: IrClassSymbol? = null
+            if (dispatchReceiver is FirQualifiedAccess) {
+                val dispatchReceiverReference = dispatchReceiver.calleeReference
+                if (dispatchReceiverReference is FirSuperReference) {
+                    val coneSuperType = dispatchReceiverReference.superTypeRef.coneTypeSafe<ConeClassLikeType>()
+                    (coneSuperType?.lookupTag?.toSymbol(session) as? FirClassSymbol<*>)?.let {
+                        superQualifierSymbol = classifierStorage.getIrClassSymbol(it)
                     }
                 }
             }
             when (symbol) {
                 is IrConstructorSymbol -> IrConstructorCallImpl.fromSymbolOwner(startOffset, endOffset, type, symbol)
-                is IrSimpleFunctionSymbol -> IrCallImpl(
-                    startOffset, endOffset, type, symbol, origin = qualifiedAccess.calleeReference.statementOrigin()
-                )
+                is IrSimpleFunctionSymbol -> {
+                    IrCallImpl(
+                        startOffset, endOffset, type, symbol,
+                        origin = qualifiedAccess.calleeReference.statementOrigin(),
+                        superQualifierSymbol = superQualifierSymbol
+                    )
+                }
                 is IrPropertySymbol -> {
                     val getter = symbol.owner.getter
                     val backingField = symbol.owner.backingField
                     when {
-                        getter != null -> IrCallImpl(startOffset, endOffset, type, getter.symbol, origin = IrStatementOrigin.GET_PROPERTY)
-                        backingField != null -> IrGetFieldImpl(startOffset, endOffset, backingField.symbol, type)
+                        getter != null -> IrCallImpl(
+                            startOffset, endOffset, type, getter.symbol, origin = IrStatementOrigin.GET_PROPERTY,
+                            superQualifierSymbol = superQualifierSymbol
+                        )
+                        backingField != null -> IrGetFieldImpl(
+                            startOffset, endOffset, backingField.symbol, type,
+                            superQualifierSymbol = superQualifierSymbol
+                        )
                         else -> IrErrorCallExpressionImpl(
                             startOffset, endOffset, type,
                             description = "No getter or backing field found for ${qualifiedAccess.calleeReference.render()}"
@@ -192,7 +207,8 @@ internal class CallAndReferenceGenerator(
                 }
                 is IrFieldSymbol -> IrGetFieldImpl(
                     startOffset, endOffset, symbol, type,
-                    origin = IrStatementOrigin.GET_PROPERTY.takeIf { qualifiedAccess.calleeReference !is FirDelegateFieldReference }
+                    origin = IrStatementOrigin.GET_PROPERTY.takeIf { qualifiedAccess.calleeReference !is FirDelegateFieldReference },
+                    superQualifierSymbol = superQualifierSymbol
                 )
                 is IrValueSymbol -> IrGetValueImpl(
                     startOffset, endOffset, type, symbol,

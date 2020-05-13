@@ -105,7 +105,7 @@ object ImplementationConfigurator : AbstractFirTreeImplementationConfigurator() 
         impl(delegatedConstructorCall) {
             default(
                 "calleeReference",
-                "if (isThis) FirExplicitThisReference(source, null) else FirExplicitSuperReference(source, constructedTypeRef)"
+                "if (isThis) FirExplicitThisReference(source, null) else FirExplicitSuperReference(source, null, constructedTypeRef)"
             )
             default("isSuper") {
                 value = "!isThis"
@@ -493,6 +493,13 @@ object ImplementationConfigurator : AbstractFirTreeImplementationConfigurator() 
         ) {
             default(it, "FirImplicitTypeRefImpl(null)")
             useTypes(implicitTypeRefType)
+        }
+
+        configureFieldInAllImplementations(
+            field = "attributes",
+            fieldPredicate = { it.type == declarationAttributesType.type }
+        ) {
+            default(it, "${declarationAttributesType.type}()")
         }
     }
 }

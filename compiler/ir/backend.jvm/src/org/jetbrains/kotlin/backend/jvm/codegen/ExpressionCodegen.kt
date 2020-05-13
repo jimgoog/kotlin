@@ -539,7 +539,17 @@ class ExpressionCodegen(
             ownerType.internalName
         } ?: typeMapper.mapClass(callee.parentAsClass).internalName
         return if (expression is IrSetField) {
-            expression.value.accept(this, data).materializeAt(fieldType, callee.type)
+            val value = expression.value.accept(this, data)
+
+            // We only initialize enum entries with a subtype of `fieldType` and can avoid the CHECKCAST.
+            // This is important for some tools which analyze bytecode for enum classes by looking at the
+            // initializer of the $VALUES field.
+            if (callee.origin == IrDeclarationOrigin.FIELD_FOR_ENUM_ENTRY) {
+                value.materialize()
+            } else {
+                value.materializeAt(fieldType, callee.type)
+            }
+
             when {
                 isStatic -> mv.putstatic(ownerName, fieldName, fieldType.descriptor)
                 else -> mv.putfield(ownerName, fieldName, fieldType.descriptor)
@@ -558,10 +568,9 @@ class ExpressionCodegen(
     override fun visitSetField(expression: IrSetField, data: BlockInfo): PromisedValue {
         val expressionValue = expression.value
         // Do not add redundant field initializers that initialize to default values.
-        val inPrimaryConstructor = irFunction is IrConstructor && irFunction.isPrimary
         val inClassInit = irFunction.origin == JvmLoweredDeclarationOrigin.CLASS_STATIC_INITIALIZER
         val isFieldInitializer = expression.origin == IrStatementOrigin.INITIALIZE_FIELD
-        val skip = (inPrimaryConstructor || inClassInit) && isFieldInitializer && expressionValue is IrConst<*> &&
+        val skip = (irFunction is IrConstructor || inClassInit) && isFieldInitializer && expressionValue is IrConst<*> &&
                 isDefaultValueForType(expression.symbol.owner.type.asmType, expressionValue.value)
         return if (skip) unitValue else super.visitSetField(expression, data)
     }
@@ -689,7 +698,8 @@ class ExpressionCodegen(
     override fun visitElement(element: IrElement, data: BlockInfo) =
         throw AssertionError(
             "Unexpected IR element found during code generation. Either code generation for it " +
-                    "is not implemented, or it should have been lowered: ${element.render()}"
+                    "is not implemented, or it should have been lowered:\n" +
+                    element.render()
         )
 
     override fun visitClass(declaration: IrClass, data: BlockInfo): PromisedValue {

@@ -39,6 +39,9 @@ class FirSyntheticProperty(
     override val source: FirSourceElement?
         get() = null
 
+    override val origin: FirDeclarationOrigin
+        get() = FirDeclarationOrigin.Synthetic
+
     override val initializer: FirExpression?
         get() = null
 
@@ -67,6 +70,8 @@ class FirSyntheticProperty(
         get() = null
 
     override val controlFlowGraphReference: FirControlFlowGraphReference = FirEmptyControlFlowGraphReference
+
+    override val attributes: FirDeclarationAttributes = FirDeclarationAttributes()
 
     // ???
     override val backingFieldSymbol: FirBackingFieldSymbol = FirBackingFieldSymbol(symbol.callableId)

@@ -31,6 +31,7 @@ import org.jetbrains.kotlin.types.model.KotlinTypeMarker
 import org.jetbrains.kotlin.types.model.TypeConstructorMarker
 import org.jetbrains.kotlin.types.model.typeConstructor
 import org.jetbrains.kotlin.types.typeUtil.contains
+import org.jetbrains.kotlin.types.typeUtil.isNothing
 import org.jetbrains.kotlin.types.typeUtil.makeNotNullable
 import org.jetbrains.kotlin.types.typeUtil.makeNullable
 import org.jetbrains.kotlin.utils.addToStdlib.safeAs
@@ -483,10 +484,10 @@ private fun KotlinResolutionCandidate.prepareExpectedType(
     argument: KotlinCallArgument,
     candidateParameter: ParameterDescriptor
 ): UnwrappedType {
-    val argumentType = getExpectedTypeWithSAMConversion(argument, candidateParameter) ?: argument.getExpectedType(
-        candidateParameter,
-        callComponents.languageVersionSettings
-    )
+    val argumentType =
+        getExpectedTypeWithSAMConversion(argument, candidateParameter)
+            ?: getExpectedTypeWithSuspendConversion(argument, candidateParameter)
+            ?: argument.getExpectedType(candidateParameter, callComponents.languageVersionSettings)
     val resultType = knownTypeParametersResultingSubstitutor?.substitute(argumentType) ?: argumentType
     return resolvedCall.freshVariablesSubstitutor.safeSubstitute(resultType)
 }
@@ -500,6 +501,8 @@ private fun KotlinResolutionCandidate.getExpectedTypeWithSAMConversion(
                 !callComponents.languageVersionSettings.supportsFeature(LanguageFeature.ProhibitVarargAsArrayAfterSamArgument)
 
     if (generatingAdditionalSamCandidateIsEnabled) return null
+    if (candidateParameter.type.isNothing()) return null
+
     val samConversionOracle = callComponents.samConversionOracle
     if (!callComponents.languageVersionSettings.supportsFeature(LanguageFeature.SamConversionForKotlinFunctions)) {
         if (!samConversionOracle.shouldRunSamConversionForFunction(resolvedCall.candidateDescriptor)) return null

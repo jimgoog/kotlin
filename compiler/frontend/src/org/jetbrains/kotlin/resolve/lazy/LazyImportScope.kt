@@ -32,7 +32,11 @@ import org.jetbrains.kotlin.psi.KtImportDirective
 import org.jetbrains.kotlin.psi.KtImportInfo
 import org.jetbrains.kotlin.psi.KtPsiUtil
 import org.jetbrains.kotlin.resolve.*
+import org.jetbrains.kotlin.resolve.annotations.JVM_THROWS_ANNOTATION_FQ_NAME
+import org.jetbrains.kotlin.resolve.annotations.KOTLIN_NATIVE_THROWS_ANNOTATION_FQ_NAME
+import org.jetbrains.kotlin.resolve.annotations.KOTLIN_THROWS_ANNOTATION_FQ_NAME
 import org.jetbrains.kotlin.resolve.deprecation.DeprecationResolver
+import org.jetbrains.kotlin.resolve.descriptorUtil.fqNameOrNull
 import org.jetbrains.kotlin.resolve.scopes.DescriptorKindFilter
 import org.jetbrains.kotlin.resolve.scopes.ImportingScope
 import org.jetbrains.kotlin.storage.NotNullLazyValue
@@ -242,12 +246,38 @@ class LazyImportScope(
                 val descriptor = getImportScope(directive).getContributedClassifier(name, location)
                 if (descriptor !is ClassDescriptor && descriptor !is TypeAliasDescriptor || !isClassifierVisible(descriptor))
                     continue /* type parameters can't be imported */
-                if (target != null && target != descriptor) return@compute null // ambiguity
-                target = descriptor
+                if (target != null && target != descriptor) {
+                    if (isKotlinOrJvmThrowsAmbiguity(descriptor, target) || isKotlinOrNativeThrowsAmbiguity(descriptor, target)) {
+                        if (descriptor.isKotlinThrows()) {
+                            target = descriptor
+                        }
+                    } else {
+                        return@compute null // ambiguity
+                    }
+                } else {
+                    target = descriptor
+                }
             }
 
             target
         }
+
+    private fun isKotlinOrJvmThrowsAmbiguity(c1: ClassifierDescriptor, c2: ClassifierDescriptor) =
+        c1.isKotlinOrJvmThrows() && c2.isKotlinOrJvmThrows()
+
+    private fun isKotlinOrNativeThrowsAmbiguity(c1: ClassifierDescriptor, c2: ClassifierDescriptor) =
+        c1.isKotlinOrNativeThrows() && c2.isKotlinOrNativeThrows()
+
+    private fun ClassifierDescriptor.isKotlinThrows() = fqNameOrNull() == KOTLIN_THROWS_ANNOTATION_FQ_NAME
+    private fun ClassifierDescriptor.isKotlinOrJvmThrows(): Boolean {
+        if (name != JVM_THROWS_ANNOTATION_FQ_NAME.shortName()) return false
+        return isKotlinThrows() || fqNameOrNull() == JVM_THROWS_ANNOTATION_FQ_NAME
+    }
+
+    private fun ClassifierDescriptor.isKotlinOrNativeThrows(): Boolean {
+        if (name != KOTLIN_THROWS_ANNOTATION_FQ_NAME.shortName()) return false
+        return isKotlinThrows() || fqNameOrNull() == KOTLIN_NATIVE_THROWS_ANNOTATION_FQ_NAME
+    }
 
     override fun getContributedPackage(name: Name): PackageViewDescriptor? = null
 

@@ -226,6 +226,11 @@ public class DiagnosticsTestWithStdLibUsingJavacGenerated extends AbstractDiagno
             runTest("compiler/testData/diagnostics/testsWithStdLib/annotations/targetuse.kt");
         }
 
+        @TestMetadata("throws.kt")
+        public void testThrows() throws Exception {
+            runTest("compiler/testData/diagnostics/testsWithStdLib/annotations/throws.kt");
+        }
+
         @TestMetadata("TransientOnDelegate.kt")
         public void testTransientOnDelegate() throws Exception {
             runTest("compiler/testData/diagnostics/testsWithStdLib/annotations/TransientOnDelegate.kt");
@@ -2037,6 +2042,16 @@ public class DiagnosticsTestWithStdLibUsingJavacGenerated extends AbstractDiagno
                 runTest("compiler/testData/diagnostics/testsWithStdLib/coroutines/inference/kt36220.kt");
             }
 
+            @TestMetadata("kt38420.kt")
+            public void testKt38420() throws Exception {
+                runTest("compiler/testData/diagnostics/testsWithStdLib/coroutines/inference/kt38420.kt");
+            }
+
+            @TestMetadata("kt38667.kt")
+            public void testKt38667() throws Exception {
+                runTest("compiler/testData/diagnostics/testsWithStdLib/coroutines/inference/kt38667.kt");
+            }
+
             @TestMetadata("nestedLambdaInferenceWithListMap.kt")
             public void testNestedLambdaInferenceWithListMap() throws Exception {
                 runTest("compiler/testData/diagnostics/testsWithStdLib/coroutines/inference/nestedLambdaInferenceWithListMap.kt");
@@ -2921,9 +2936,19 @@ public class DiagnosticsTestWithStdLibUsingJavacGenerated extends AbstractDiagno
             runTest("compiler/testData/diagnostics/testsWithStdLib/inference/kt37627.kt");
         }
 
+        @TestMetadata("kt38143.kt")
+        public void testKt38143() throws Exception {
+            runTest("compiler/testData/diagnostics/testsWithStdLib/inference/kt38143.kt");
+        }
+
         @TestMetadata("kt4975.kt")
         public void testKt4975() throws Exception {
             runTest("compiler/testData/diagnostics/testsWithStdLib/inference/kt4975.kt");
+        }
+
+        @TestMetadata("recursiveFlexibleAssertions.kt")
+        public void testRecursiveFlexibleAssertions() throws Exception {
+            runTest("compiler/testData/diagnostics/testsWithStdLib/inference/recursiveFlexibleAssertions.kt");
         }
 
         @TestMetadata("compiler/testData/diagnostics/testsWithStdLib/inference/annotationsForResolve")
@@ -3054,6 +3079,82 @@ public class DiagnosticsTestWithStdLibUsingJavacGenerated extends AbstractDiagno
             }
         }
 
+        @TestMetadata("compiler/testData/diagnostics/testsWithStdLib/inference/completion")
+        @TestDataPath("$PROJECT_ROOT")
+        @RunWith(JUnit3RunnerWithInners.class)
+        public static class Completion extends AbstractDiagnosticsTestWithStdLibUsingJavac {
+            private void runTest(String testDataFilePath) throws Exception {
+                KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+            }
+
+            public void testAllFilesPresentInCompletion() throws Exception {
+                KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/diagnostics/testsWithStdLib/inference/completion"), Pattern.compile("^(.+)\\.kt$"), Pattern.compile("^(.+)\\.fir\\.kts?$"), true);
+            }
+
+            @TestMetadata("compiler/testData/diagnostics/testsWithStdLib/inference/completion/postponedArgumentsAnalysis")
+            @TestDataPath("$PROJECT_ROOT")
+            @RunWith(JUnit3RunnerWithInners.class)
+            public static class PostponedArgumentsAnalysis extends AbstractDiagnosticsTestWithStdLibUsingJavac {
+                private void runTest(String testDataFilePath) throws Exception {
+                    KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+                }
+
+                public void testAllFilesPresentInPostponedArgumentsAnalysis() throws Exception {
+                    KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/diagnostics/testsWithStdLib/inference/completion/postponedArgumentsAnalysis"), Pattern.compile("^(.+)\\.kt$"), Pattern.compile("^(.+)\\.fir\\.kts?$"), true);
+                }
+
+                @TestMetadata("callableReferences.kt")
+                public void testCallableReferences() throws Exception {
+                    runTest("compiler/testData/diagnostics/testsWithStdLib/inference/completion/postponedArgumentsAnalysis/callableReferences.kt");
+                }
+
+                @TestMetadata("complexInterdependentInputOutputTypes.kt")
+                public void testComplexInterdependentInputOutputTypes() throws Exception {
+                    runTest("compiler/testData/diagnostics/testsWithStdLib/inference/completion/postponedArgumentsAnalysis/complexInterdependentInputOutputTypes.kt");
+                }
+
+                @TestMetadata("deepLambdas.kt")
+                public void testDeepLambdas() throws Exception {
+                    runTest("compiler/testData/diagnostics/testsWithStdLib/inference/completion/postponedArgumentsAnalysis/deepLambdas.kt");
+                }
+
+                @TestMetadata("fixIndependentVariables.kt")
+                public void testFixIndependentVariables() throws Exception {
+                    runTest("compiler/testData/diagnostics/testsWithStdLib/inference/completion/postponedArgumentsAnalysis/fixIndependentVariables.kt");
+                }
+
+                @TestMetadata("fixInputTypeToMoreSpecificType.kt")
+                public void testFixInputTypeToMoreSpecificType() throws Exception {
+                    runTest("compiler/testData/diagnostics/testsWithStdLib/inference/completion/postponedArgumentsAnalysis/fixInputTypeToMoreSpecificType.kt");
+                }
+
+                @TestMetadata("fixReceiverToMoreSpecificType.kt")
+                public void testFixReceiverToMoreSpecificType() throws Exception {
+                    runTest("compiler/testData/diagnostics/testsWithStdLib/inference/completion/postponedArgumentsAnalysis/fixReceiverToMoreSpecificType.kt");
+                }
+
+                @TestMetadata("moreSpecificOutputType.kt")
+                public void testMoreSpecificOutputType() throws Exception {
+                    runTest("compiler/testData/diagnostics/testsWithStdLib/inference/completion/postponedArgumentsAnalysis/moreSpecificOutputType.kt");
+                }
+
+                @TestMetadata("rerunStagesAfterFixationInFullMode.kt")
+                public void testRerunStagesAfterFixationInFullMode() throws Exception {
+                    runTest("compiler/testData/diagnostics/testsWithStdLib/inference/completion/postponedArgumentsAnalysis/rerunStagesAfterFixationInFullMode.kt");
+                }
+
+                @TestMetadata("rerunStagesAfterFixationInPartialMode.kt")
+                public void testRerunStagesAfterFixationInPartialMode() throws Exception {
+                    runTest("compiler/testData/diagnostics/testsWithStdLib/inference/completion/postponedArgumentsAnalysis/rerunStagesAfterFixationInPartialMode.kt");
+                }
+
+                @TestMetadata("suspendFunctions.kt")
+                public void testSuspendFunctions() throws Exception {
+                    runTest("compiler/testData/diagnostics/testsWithStdLib/inference/completion/postponedArgumentsAnalysis/suspendFunctions.kt");
+                }
+            }
+        }
+
         @TestMetadata("compiler/testData/diagnostics/testsWithStdLib/inference/delegates")
         @TestDataPath("$PROJECT_ROOT")
         @RunWith(JUnit3RunnerWithInners.class)
@@ -3079,6 +3180,24 @@ public class DiagnosticsTestWithStdLibUsingJavacGenerated extends AbstractDiagno
             @TestMetadata("kt32249.kt")
             public void testKt32249() throws Exception {
                 runTest("compiler/testData/diagnostics/testsWithStdLib/inference/delegates/kt32249.kt");
+            }
+        }
+
+        @TestMetadata("compiler/testData/diagnostics/testsWithStdLib/inference/nothingType")
+        @TestDataPath("$PROJECT_ROOT")
+        @RunWith(JUnit3RunnerWithInners.class)
+        public static class NothingType extends AbstractDiagnosticsTestWithStdLibUsingJavac {
+            private void runTest(String testDataFilePath) throws Exception {
+                KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+            }
+
+            public void testAllFilesPresentInNothingType() throws Exception {
+                KotlinTestUtils.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/diagnostics/testsWithStdLib/inference/nothingType"), Pattern.compile("^(.+)\\.kt$"), Pattern.compile("^(.+)\\.fir\\.kts?$"), true);
+            }
+
+            @TestMetadata("dontInferToNullableNothingInDelegates.kt")
+            public void testDontInferToNullableNothingInDelegates() throws Exception {
+                runTest("compiler/testData/diagnostics/testsWithStdLib/inference/nothingType/dontInferToNullableNothingInDelegates.kt");
             }
         }
     }

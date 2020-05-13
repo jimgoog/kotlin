@@ -3,7 +3,7 @@ public final class User$Companion : java/lang/Object {
 
     public void <init>(kotlin.jvm.internal.DefaultConstructorMarker $constructor_marker)
 
-    private static void test$annotations()
+    private static void getTest$annotations()
 }
 
 public final class User$Creator : java/lang/Object, android/os/Parcelable$Creator {

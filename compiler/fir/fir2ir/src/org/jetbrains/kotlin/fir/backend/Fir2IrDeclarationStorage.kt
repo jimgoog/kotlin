@@ -10,8 +10,10 @@ import org.jetbrains.kotlin.builtins.KotlinBuiltIns.*
 import org.jetbrains.kotlin.descriptors.*
 import org.jetbrains.kotlin.descriptors.annotations.Annotations
 import org.jetbrains.kotlin.fir.declarations.*
+import org.jetbrains.kotlin.fir.declarations.impl.FirDefaultPropertyAccessor
 import org.jetbrains.kotlin.fir.declarations.impl.FirDefaultPropertyGetter
 import org.jetbrains.kotlin.fir.declarations.impl.FirDefaultPropertySetter
+import org.jetbrains.kotlin.fir.declarations.impl.FirPropertyAccessorImpl
 import org.jetbrains.kotlin.fir.descriptors.FirBuiltInsPackageFragment
 import org.jetbrains.kotlin.fir.descriptors.FirModuleDescriptor
 import org.jetbrains.kotlin.fir.descriptors.FirPackageFragmentDescriptor
@@ -214,6 +216,7 @@ class Fir2IrDeclarationStorage(
                         if (functionSymbol is FirNamedFunctionSymbol) {
                             val fakeOverrideSymbol =
                                 FirClassSubstitutionScope.createFakeOverrideFunction(session, functionSymbol.fir, functionSymbol)
+                            classifierStorage.preCacheTypeParameters(functionSymbol.fir)
                             irClass.declarations += createIrFunction(fakeOverrideSymbol.fir, irClass)
                         }
                     }
@@ -221,6 +224,7 @@ class Fir2IrDeclarationStorage(
                         if (propertySymbol is FirPropertySymbol) {
                             val fakeOverrideSymbol =
                                 FirClassSubstitutionScope.createFakeOverrideProperty(session, propertySymbol.fir, propertySymbol)
+                            classifierStorage.preCacheTypeParameters(propertySymbol.fir)
                             irClass.declarations += createIrProperty(fakeOverrideSymbol.fir, irClass)
                         }
                     }
@@ -435,7 +439,7 @@ class Fir2IrDeclarationStorage(
                     isFakeOverride = updatedOrigin == IrDeclarationOrigin.FAKE_OVERRIDE,
                     isOperator = simpleFunction?.isOperator == true
                 ).apply {
-                    metadata = MetadataSource.Function(descriptor)
+                    metadata = FirMetadataSource.Function(function, descriptor)
                 }
             }
             result
@@ -450,6 +454,9 @@ class Fir2IrDeclarationStorage(
             (function.symbol.overriddenSymbol as? FirNamedFunctionSymbol)?.let {
                 created.overriddenSymbols += getIrFunctionSymbol(it) as IrSimpleFunctionSymbol
             }
+        }
+        if (!created.isFakeOverride && simpleFunction?.isOverride == true && thisReceiverOwner != null) {
+            created.populateOverriddenSymbols(thisReceiverOwner)
         }
         functionCache[function] = created
         return created
@@ -492,7 +499,7 @@ class Fir2IrDeclarationStorage(
                     constructor.returnTypeRef.toIrType(),
                     isInline = false, isExternal = false, isPrimary = isPrimary, isExpect = false
                 ).apply {
-                    metadata = MetadataSource.Function(descriptor)
+                    metadata = FirMetadataSource.Function(constructor, descriptor)
                     enterScope(descriptor)
                 }.bindAndDeclareParameters(constructor, descriptor, irParent, isStatic = false).apply {
                     leaveScope(descriptor)
@@ -540,7 +547,9 @@ class Fir2IrDeclarationStorage(
                 isFakeOverride = origin == IrDeclarationOrigin.FAKE_OVERRIDE,
                 isOperator = false
             ).apply {
-                metadata = MetadataSource.Function(descriptor)
+                if (propertyAccessor != null) {
+                    metadata = FirMetadataSource.Function(propertyAccessor, descriptor)
+                }
                 with(classifierStorage) {
                     setTypeParameters(
                         property, ConversionTypeContext(
@@ -564,6 +573,14 @@ class Fir2IrDeclarationStorage(
                     parent = irParent
                 }
                 correspondingPropertySymbol = correspondingProperty.symbol
+                val isOverride = when (propertyAccessor) {
+                    is FirDefaultPropertyAccessor -> property.isOverride
+                    is FirPropertyAccessorImpl -> propertyAccessor.status.isOverride
+                    else -> false
+                }
+                if (!isFakeOverride && isOverride && thisReceiverOwner != null) {
+                    populateOverriddenSymbols(thisReceiverOwner)
+                }
             }
         }
     }
@@ -576,6 +593,7 @@ class Fir2IrDeclarationStorage(
         name: Name,
         isFinal: Boolean,
         firInitializerExpression: FirExpression?,
+        thisReceiverOwner: IrClass?,
         type: IrType? = null
     ): IrField {
         val inferredType = type ?: firInitializerExpression!!.typeRef.toIrType()
@@ -590,6 +608,9 @@ class Fir2IrDeclarationStorage(
                 isFakeOverride = origin == IrDeclarationOrigin.FAKE_OVERRIDE
             ).also {
                 it.correspondingPropertySymbol = this@createBackingField.symbol
+                if (!isFakeOverride && property.isOverride && thisReceiverOwner != null) {
+                    it.populateOverriddenSymbols(thisReceiverOwner)
+                }
             }
         }
     }
@@ -628,7 +649,7 @@ class Fir2IrDeclarationStorage(
                     isExpect = property.isExpect,
                     isFakeOverride = origin == IrDeclarationOrigin.FAKE_OVERRIDE
                 ).apply {
-                    metadata = MetadataSource.Property(descriptor)
+                    metadata = FirMetadataSource.Variable(property, descriptor)
                     descriptor.bind(this)
                     if (irParent != null) {
                         parent = irParent
@@ -645,7 +666,8 @@ class Fir2IrDeclarationStorage(
                         ) {
                             backingField = createBackingField(
                                 property, IrDeclarationOrigin.PROPERTY_BACKING_FIELD, descriptor,
-                                property.fieldVisibility, property.name, property.isVal, initializer, type
+                                property.fieldVisibility, property.name, property.isVal, initializer,
+                                thisReceiverOwner, type
                             ).also { field ->
                                 if (initializer is FirConstExpression<*>) {
                                     // TODO: Normally we shouldn't have error type here
@@ -656,7 +678,8 @@ class Fir2IrDeclarationStorage(
                         } else if (delegate != null) {
                             backingField = createBackingField(
                                 property, IrDeclarationOrigin.PROPERTY_DELEGATE, descriptor,
-                                property.fieldVisibility, Name.identifier("${property.name}\$delegate"), true, delegate
+                                property.fieldVisibility, Name.identifier("${property.name}\$delegate"), true, delegate,
+                                thisReceiverOwner
                             )
                         }
                         if (irParent != null) {
@@ -712,7 +735,7 @@ class Fir2IrDeclarationStorage(
                     isStatic = field.isStatic,
                     isFakeOverride = false
                 ).apply {
-                    metadata = MetadataSource.Property(descriptor)
+                    metadata = FirMetadataSource.Variable(field, descriptor)
                     descriptor.bind(this)
                     fieldCache[field] = this
                 }
@@ -899,7 +922,8 @@ class Fir2IrDeclarationStorage(
                 val irEnumEntry = classifierStorage.createIrEnumEntry(
                     firDeclaration,
                     irParent = irParentClass,
-                    origin = if (containingFile == null) IrDeclarationOrigin.IR_EXTERNAL_DECLARATION_STUB else IrDeclarationOrigin.DEFINED
+                    origin = if (containingFile != null) IrDeclarationOrigin.DEFINED else
+                        (parentClassSymbol?.fir as? FirClass<*>)?.irOrigin(firProvider) ?: IrDeclarationOrigin.IR_EXTERNAL_DECLARATION_STUB
                 )
                 symbolTable.referenceEnumEntry(irEnumEntry.descriptor)
             }
@@ -913,6 +937,21 @@ class Fir2IrDeclarationStorage(
                 getIrVariableSymbol(firDeclaration)
             }
         }
+    }
+
+    private fun IrSimpleFunction.populateOverriddenSymbols(thisReceiverOwner: IrClass) {
+        thisReceiverOwner.findMatchingOverriddenSymbolsFromSupertypes(components.irBuiltIns, this).forEach {
+            if (it is IrSimpleFunctionSymbol) {
+                overriddenSymbols += it
+            }
+        }
+    }
+
+    private fun IrField.populateOverriddenSymbols(thisReceiverOwner: IrClass) {
+        thisReceiverOwner.findMatchingOverriddenSymbolsFromSupertypes(components.irBuiltIns, this)
+            .filterIsInstance<IrFieldSymbol>().singleOrNull()?.let {
+                overriddenSymbols = listOf(it)
+            }
     }
 
     companion object {
