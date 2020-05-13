@@ -47,18 +47,18 @@ cd $PROG_DIR
 ./gradlew install ideaPlugin  :compiler:tests-common:testJar --no-daemon -Pbuild.number=$R4A_BUILD_NUMBER -PdeployVersion=$R4A_BUILD_NUMBER -Dmaven.repo.local=$OUT_DIR/m2  -Pteamcity=true
 
 # Run tests
-rm -rf $DIST_DIR/host-test-reports
-mkdir $DIST_DIR/host-test-reports
+#rm -rf $DIST_DIR/host-test-reports
+#mkdir $DIST_DIR/host-test-reports
 
-./gradlew --info --full-stacktrace --continue :compiler:test --tests *ParsingTestGenerated* -Pteamcity=true
-cd compiler/build/test-results/test
-zip -r $DIST_DIR/host-test-reports/compilerTests.zip *
-cd $PROG_DIR
+#./gradlew --info --full-stacktrace --continue :compiler:test --tests *ParsingTestGenerated* -Pteamcity=true
+#cd compiler/build/test-results/test
+#zip -r $DIST_DIR/host-test-reports/compilerTests.zip *
+#cd $PROG_DIR
 
-./gradlew  --info --full-stacktrace --continue :idea:test --tests *FormatterTestGenerated* -Pteamcity=true
-cd idea/build/test-results/test
-zip -r $DIST_DIR/host-test-reports/ideaTests.zip *
-cd $PROG_DIR
+#./gradlew  --info --full-stacktrace --continue :idea:test --tests *FormatterTestGenerated* -Pteamcity=true
+#cd idea/build/test-results/test
+#zip -r $DIST_DIR/host-test-reports/ideaTests.zip *
+#cd $PROG_DIR
 
 # Copy jar files that are not published in the build but are required by androidx.compose
 echo "Copying additional repositories"

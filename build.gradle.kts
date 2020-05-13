@@ -481,6 +481,7 @@ gradle.taskGraph.whenReady {
 }
 
 val dist = tasks.register("dist") {
+    System.setProperty("kotlin.test.is.pre.release", "false")
     dependsOn(":kotlin-compiler:dist")
 }
 

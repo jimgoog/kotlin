@@ -54,6 +54,14 @@ object JvmBackendFacade {
             mangler
         )
 
+        val dependencies = psi2irContext.moduleDescriptor.allDependencyModules.map {
+            val kotlinLibrary = (it.getCapability(KlibModuleOrigin.CAPABILITY) as? DeserializedKlibModuleOrigin)?.library
+            irLinker.deserializeIrModuleHeader(it, kotlinLibrary)
+        }
+        val irProviders = listOf(irLinker)
+
+        stubGenerator.setIrProviders(irProviders)
+
         val pluginContext by lazy {
             psi2irContext.run {
                 val symbols = BuiltinSymbolsBase(irBuiltIns, moduleDescriptor.builtIns, symbolTable.lazyWrapper)
@@ -62,18 +70,6 @@ object JvmBackendFacade {
                 )
             }
         }
-
-        val stubGenerator = DeclarationStubGenerator(
-            psi2irContext.moduleDescriptor, psi2irContext.symbolTable, psi2irContext.irBuiltIns.languageVersionSettings, extensions
-        )
-        val irLinker = JvmIrLinker(psi2irContext.moduleDescriptor, EmptyLoggingContext, psi2irContext.irBuiltIns, psi2irContext.symbolTable, stubGenerator, mangler)
-        val dependencies = psi2irContext.moduleDescriptor.allDependencyModules.map {
-            val kotlinLibrary = (it.getCapability(KlibModuleOrigin.CAPABILITY) as? DeserializedKlibModuleOrigin)?.library
-            irLinker.deserializeIrModuleHeader(it, kotlinLibrary)
-        }
-        val irProviders = listOf(irLinker)
-
-        stubGenerator.setIrProviders(irProviders)
 
         for (extension in pluginExtensions) {
             psi2ir.addPostprocessingStep { module ->
